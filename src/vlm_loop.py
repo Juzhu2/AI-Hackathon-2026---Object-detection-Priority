@@ -27,6 +27,7 @@ Add:     --fused /dev/shm/fused.jsonl                        enable the fast pat
 """
 import argparse
 import base64
+import queue
 import json
 import os
 import re
@@ -106,8 +107,10 @@ OVERVIEW_PROMPT = (
     "this is, its overall layout and the lighting, then name the main things in view with where "
     "they are (left, ahead, right; near or far), and end with where the open space or clear path "
     "is. Details of the left and right sides come later, so keep this an overview. "
-    "Describe only what you can actually see. For people, say only that a person is there and "
-    "where; never describe faces, clothing or names, and never say what anyone is doing. "
+    "Describe only what you can actually see. "
+    "People: if anyone is in view, mention them once, briefly (for example: a person is "
+    "standing ahead), and then describe the place and objects instead; never describe faces, "
+    "clothing, names or what anyone is doing. "
     "Only if the image is completely dark or blank, reply exactly: Camera view unclear."
 )
 
@@ -117,14 +120,15 @@ SECTION_PROMPT = (
     "state (open or closed, on or off, full or empty), and read any text, labels or screens "
     "word for word. Begin with: On your {side},  Use 3 to 5 sentences. "
     "Already told the user: \"{told}\" Do not repeat that; add new details only. "
-    "Only describe what you can actually see. For people, say only that a person is there; "
-    "never describe faces, clothing or names. If there is nothing new to add, reply exactly: "
+    "Only describe what you can actually see. Do not mention people at all here: describe the "
+    "furniture, objects, surfaces, text and space around them. If there is nothing new to add, reply exactly: "
     "Nothing more on the {side}."
 )
 
 MORE_PROMPT = (
     "Tell me more about the same image: smaller objects, textures, patterns, things in the "
-    "background, and any text you did not read yet. 4 to 6 sentences. Do not repeat anything "
+    "background, and any text you did not read yet. 4 to 6 sentences. Do not talk about people. "
+    "Do not repeat anything "
     "you already said. Only describe what you can actually see; if there is nothing more, "
     "say: That is everything I can see."
 )
@@ -292,6 +296,16 @@ def told_recently(n=2):
         return [h[3] for h in spoken_history[-n:]]
 
 
+# ---------- UI events (only collected when the window is open) ----------
+UI_EVENTS = None          # queue.Queue set by main() with --ui
+
+
+def emit(kind, text="", priority=0.0):
+    """kind: speak | interrupted | mode | status. The UI drains UI_EVENTS every 100 ms."""
+    if UI_EVENTS is not None:
+        UI_EVENTS.put((time.time(), kind, text, priority))
+
+
 # ---------- speech + prioritizer ----------
 TTS = None                # set in main() from --tts-cmd (tts_files.FileTTS)
 
@@ -303,16 +317,19 @@ def speak(text, cancel=None, priority=0):
     Real TTS: start Piper/Kokoro/espeak-ng as a subprocess (Popen), poll `cancel`
     while it runs, and call proc.terminate() if it is set."""
     print(f"[SPEAK] {text}")
+    emit("speak", text, priority)
     if TTS is not None:
         status = TTS.speak(text, cancel, urgent=priority >= URGENT_PRIORITY)
         if status == "cancelled":
             print("[interrupted]")
+            emit("interrupted", text)
         return
     if SIMULATE_SPEECH_TIME:
         end = time.time() + len(text.split()) / SPEAK_WORDS_PER_S
         while time.time() < end:
             if cancel is not None and cancel.is_set():
                 print("[interrupted]")
+                emit("interrupted", text)
                 return
             time.sleep(0.05)
 
@@ -369,6 +386,17 @@ class Speaker:
             if TTS is not None:
                 TTS.discard()
             if self.speaking and self.current_kind == "narration":
+                self.cancel.set()
+
+    def hush(self):
+        """Stop talking now: drop what is waiting and cut off the current sentence."""
+        with self.cv:
+            self.backlog.clear()
+            self.pending = None
+            self._drop_current = True
+            if TTS is not None:
+                TTS.discard()
+            if self.speaking:
                 self.cancel.set()
 
     def idle(self):
@@ -430,6 +458,13 @@ def request_describe():
 
 
 more_request = threading.Event()
+cancel_generation = threading.Event()   # "Stop talking": also stop generating the description
+
+
+def hush():
+    cancel_generation.set()
+    speaker.hush()
+    emit("status", "Stopped talking.")
 last_description = {}        # {"image": b64, "prompt": str, "text": str} of the latest description
 
 
@@ -458,6 +493,7 @@ def set_mode(new):
         speaker.stop_narration()
         speaker.submit(f"{new.capitalize()} mode.", priority=HAZARD, ttl=3.0, dedupe=False)
         print(f"(mode -> {new})")
+    emit("mode", new)
     if new == DESCRIBE:
         request_describe()
     else:
@@ -579,7 +615,8 @@ def _stream_description(frame, prompt, messages=None, max_tokens=DESCRIBE_MAX_TO
         for line in r.iter_lines():
             if not line:
                 continue
-            if current_mode() != DESCRIBE or describe_request.is_set() or more_request.is_set():
+            if (current_mode() != DESCRIBE or describe_request.is_set() or more_request.is_set()
+                    or cancel_generation.is_set()):
                 print("(description cancelled)")
                 return "cancelled"
             chunk = json.loads(line)
@@ -616,6 +653,8 @@ def describe_long(frame):
     generated. If the model answers "Camera view unclear" although the frame looks like a
     normal scene (not dark, not flat), the model is refusing rather than the camera failing,
     so retry once with a simpler prompt before telling the user."""
+    cancel_generation.clear()
+    emit("status", "Describing the view...")
     cv2.imwrite("last_described.jpg", downscale(frame))     # debug: exactly what the model sees
     t = thumb(frame)
     if float(t.mean()) < DARK_THRESHOLD:
@@ -644,7 +683,8 @@ def _describe_sections(frame):
     pad = int(w * SECTION_OVERLAP)
     crops = [("left", frame[:, :half + pad]), ("right", frame[:, half - pad:])]
     for side, crop in crops:
-        if current_mode() != DESCRIBE or describe_request.is_set() or more_request.is_set():
+        if (current_mode() != DESCRIBE or describe_request.is_set() or more_request.is_set()
+                or cancel_generation.is_set()):
             return
         told = last_description.get("text", "")[-600:].replace('"', "'")
         prompt = SECTION_PROMPT.format(side=side, told=told)
@@ -660,6 +700,8 @@ def describe_more():
     d = dict(last_description)
     if not d.get("text"):
         return
+    cancel_generation.clear()
+    emit("status", "Looking for more detail...")
     messages = [{"role": "user", "content": d["prompt"], "images": [d["image"]]},
                 {"role": "assistant", "content": d["text"]},
                 {"role": "user", "content": MORE_PROMPT}]
@@ -719,10 +761,13 @@ def main():
     ap.add_argument("--fused", help="follow the fuser's JSONL output (e.g. /dev/shm/fused.jsonl)")
     ap.add_argument("--mode", choices=[NAV, DESCRIBE], default=NAV, help="starting mode")
     ap.add_argument("--describe-model", help="model for description mode (e.g. gemma4:26b)")
+    ap.add_argument("--ui", action="store_true", help="open the window (camera view, text, buttons)")
+    ap.add_argument("--view", help="image the window shows (default: the --frame-file); "
+                                   "e.g. /dev/shm/annotated.jpg for boxes and distances")
     ap.add_argument("--tts-cmd", help="file-writing TTS command with {text} and {out} placeholders")
     args = ap.parse_args()
 
-    global DESCRIBE_MODEL, TTS
+    global DESCRIBE_MODEL, TTS, UI_EVENTS
     if args.describe_model:
         DESCRIBE_MODEL = args.describe_model
     if args.tts_cmd:
@@ -743,6 +788,19 @@ def main():
     else:
         cam = LatestFrame(CAMERA_INDEX)
     threading.Thread(target=input_worker, daemon=True).start()
+    if args.ui:
+        UI_EVENTS = queue.Queue()
+        import ui                                    # Tk must own the main thread
+        threading.Thread(target=run, args=(cam,), daemon=True).start()
+        if args.mode == DESCRIBE:
+            set_mode(DESCRIBE)
+        else:
+            emit("mode", NAV)
+        ui.App(sys.modules[__name__], view_path=args.view or args.frame_file,
+               frame_source=cam.get).mainloop()
+        if TTS is not None:
+            TTS.sweep(0)
+        return
     if args.mode == DESCRIBE:
         set_mode(DESCRIBE)
     run(cam)

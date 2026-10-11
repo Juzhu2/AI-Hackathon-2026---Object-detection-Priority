@@ -45,6 +45,9 @@ class FrameShare:
         self._last = 0.0
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
 
+    def due(self):
+        return time.monotonic() - self._last >= self.every_s
+
     def write(self, frame):
         now = time.monotonic()
         if now - self._last < self.every_s:

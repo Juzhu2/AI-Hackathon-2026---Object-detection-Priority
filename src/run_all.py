@@ -5,6 +5,7 @@
     python run_all.py --describe-model gemma4:26b       # richer descriptions
     python run_all.py --outdoor                         # outdoor depth model
     python run_all.py --no-window                       # over SSH (no screen)
+    python run_all.py --cv-window                       # old OpenCV camera window instead of the app
     python run_all.py --no-tts                          # print instead of speaking
 
 Process 1: webcam_detection.py owns the camera, runs YOLO + depth + fuser, writes
@@ -56,6 +57,12 @@ def preflight(args):
         print("[check] no screen in this terminal (SSH?): showing no window. "
               "Run it from the GX10's own desktop to see the camera view.")
         args.window = False
+    if args.window and not args.cv_window:
+        r = subprocess.run([sys.executable, "-c", "import tkinter"], capture_output=True)
+        if r.returncode != 0:
+            print("[check] Tkinter missing (sudo apt install -y python3-tk): "
+                  "using the plain OpenCV camera window instead of the app")
+            args.cv_window = True
     return ok
 
 
@@ -106,6 +113,10 @@ def main():
     ap.add_argument("--no-tts", action="store_true", help="print sentences instead of speaking")
     ap.add_argument("--no-window", dest="window", action="store_false",
                     help="do not show the camera window (needed over SSH)")
+    ap.add_argument("--cv-window", action="store_true",
+                    help="show the detector's OpenCV window instead of the app window")
+    ap.add_argument("--annotated", default="/dev/shm/annotated.jpg",
+                    help="annotated view the app shows (boxes, ids, distances)")
     ap.add_argument("--skip-checks", action="store_true")
     ap.add_argument("--detector-args", default="", help='extra args, e.g. "--depth-mode outdoor"')
     ap.add_argument("--vlm-args", default="", help="extra args for vlm_loop.py")
@@ -119,7 +130,8 @@ def main():
         print("[run_all] fix the items above (or add --skip-checks)")
         return 1
 
-    for path in (args.fused, args.frame):     # never start on the previous run's data
+    app = args.window and not args.cv_window
+    for path in (args.fused, args.frame, args.annotated):   # never start on old data
         try:
             os.remove(path)
         except FileNotFoundError:
@@ -129,12 +141,14 @@ def main():
                "--fused-jsonl", args.fused, "--share-frame", args.frame,
                "--camera", str(args.camera),
                "--depth-mode", "outdoor" if args.outdoor else "indoor",
-               *([] if args.window else ["--no-display"]),
+               *([] if args.window and not app else ["--no-display"]),
+               *(["--share-annotated", args.annotated] if app else []),
                *shlex.split(args.detector_args)]
     vlm_cmd = [sys.executable, args.vlm_script, "--frame-file", args.frame, "--fused", args.fused,
                "--mode", args.mode,
                *(["--describe-model", args.describe_model] if args.describe_model else []),
                *([] if args.no_tts else ["--tts-cmd", args.tts_cmd]),
+               *(["--ui", "--view", args.annotated] if app else []),
                *shlex.split(args.vlm_args)]
 
     detector = vlm = None
@@ -154,8 +168,11 @@ def main():
             return 1
 
         print("[run_all] starting VLM loop:", " ".join(vlm_cmd))
-        print("[run_all] keys (type in THIS terminal, then Enter): n navigation | d describe | "
-              "r describe again | m more | Ctrl+C quit. Q in the camera window also quits.")
+        if app:
+            print("[run_all] app window opening: buttons or keys N / D / M / Space (stop talking) / Q")
+        else:
+            print("[run_all] keys (type in THIS terminal, then Enter): n navigation | d describe | "
+                  "r describe again | m more | Ctrl+C quit. Q in the camera window also quits.")
         vlm = subprocess.Popen(vlm_cmd, cwd=os.path.dirname(args.vlm_script))  # keeps the terminal
         while True:
             if detector.poll() is not None:

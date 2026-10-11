@@ -115,6 +115,9 @@ def parse_args():
     parser.add_argument("--share-frame", type=Path,
                         help="Atomically write the latest camera frame to this JPEG for vlm_loop.py "
                              "(--frame-file). Example: /dev/shm/latest.jpg")
+    parser.add_argument("--share-annotated", type=Path,
+                        help="Also write the annotated view (boxes, ids, distances) here for the UI. "
+                             "Example: /dev/shm/annotated.jpg")
     parser.add_argument("--share-every", type=float, default=0.5,
                         help="Seconds between shared frames (default: 0.5)")
     parser.add_argument("--hfov", type=float, default=70.0,
@@ -340,7 +343,7 @@ def main():
             resources.callback(clean_writer.close)  # finishes the JSON on exit or Ctrl+C
             print(f"Writing clean JSON to {args.clean_json}")
 
-        fused_stream = frame_share = None
+        fused_stream = frame_share = annot_share = None
         if args.fused_jsonl:
             from fused_stream import FusedStream
 
@@ -355,6 +358,12 @@ def main():
             frame_share = FrameShare(args.share_frame, cv2, args.share_every)
             resources.callback(frame_share.close)
             print(f"Sharing latest frame at {args.share_frame}")
+        if args.share_annotated:
+            from fused_stream import FrameShare
+
+            annot_share = FrameShare(args.share_annotated, cv2, every_s=0.1, quality=75)
+            resources.callback(annot_share.close)
+            print(f"Sharing annotated view at {args.share_annotated}")
 
         if not args.no_display:
             cv2.namedWindow(window, cv2.WINDOW_NORMAL)
@@ -437,7 +446,8 @@ def main():
                 output.write(json.dumps(record) + "\n")
             if args.debug:
                 print(json.dumps(record))
-            if args.no_display:
+            # Draw only when someone looks: our own window, or the UI (about 10 times a second).
+            if args.no_display and (annot_share is None or not annot_share.due()):
                 continue
             image = results[0][1].plot()
             for _, extra in results[1:]:
@@ -445,7 +455,7 @@ def main():
             image = draw_debug(cv2, image, record, metadata["profile"], config)
             if depth_est is not None:
                 image = draw_depth(image, record)
-                if args.show_depth:
+                if args.show_depth and not args.no_display:
                     cv2.imshow("Depth", colorize(depth_map, frame.shape, depth_est.mode))
             if prioritizer is not None and timestamp - last_said[1] < 4:
                 caption_pos = (10, image.shape[0] - 20)
@@ -453,6 +463,10 @@ def main():
                             0.9, (0, 0, 0), 5, cv2.LINE_AA)
                 cv2.putText(image, last_said[0], caption_pos, cv2.FONT_HERSHEY_SIMPLEX,
                             0.9, (255, 255, 255), 2, cv2.LINE_AA)
+            if annot_share is not None:
+                annot_share.write(image)
+            if args.no_display:
+                continue
             cv2.imshow(window, image)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), ord("Q"), 27):

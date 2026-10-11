@@ -13,19 +13,21 @@ cd ~/src
 ./start.sh
 ```
 
-Wait until the camera window appears (first start takes about a minute), then type commands in that terminal, each followed by Enter:
+Wait until the **VisionAssist** window opens (first start takes about a minute). It shows the camera view with boxes and distances, the current mode, hazard-sensing status, what is being said right now, and a log of everything said.
 
-| Key | Does |
-|---|---|
-| `n` | Navigation mode: short sentences while walking |
-| `d` | Description mode: one long, detailed description of the view |
-| `r` | Describe again (fresh image) |
-| `m` | Tell me more about the same view, without repeating |
-| `Ctrl+C` | Quit everything (or press `Q` in the camera window) |
+| Button | Key (in the window) | Does |
+|---|---|---|
+| Navigate | `N` | Navigation mode: short sentences while walking |
+| Describe | `D` (or `R`) | Description mode: overview, then left and right in detail (press again for a fresh image) |
+| More | `M` | More detail about the same view, without repeating |
+| Stop talking | `Space` / `Esc` | Silence now and stop generating |
+| Quit | `Q` | Closes the window and stops everything |
+
+The terminal keys still work too (`n`, `d`, `r`, `m` + Enter), and `Ctrl+C` in the terminal quits.
 
 Hazard warnings ("Stop. Person ahead, 1 meter.") interrupt whatever is being said.
 - **Navigation mode:** all hazards; an alert ends any narration.
-- **Description mode** (user standing still): only things **moving toward the user** interrupt. Static "Stop" lines (e.g. you standing in front of the camera) are held back, and the description **resumes** after an alert, repeating the sentence that was cut.
+- **Description mode** (user standing still): only things **clearly walking toward the user** interrupt (≥0.8 m/s, within 3 m, sustained ~0.5 s). Static "Stop" lines (e.g. you standing in front of the camera) are held back, and the description **resumes** after an alert, repeating the sentence that was cut.
 
 ---
 
@@ -44,12 +46,13 @@ Hazard warnings ("Stop. Person ahead, 1 meter.") interrupt whatever is being sai
 | `vlm_loop.py` | Process 2: VLM via Ollama, modes, prioritizer / speaker |
 | `fastpath.py` | Hazard rules on the fuser stream (stop / approaching / in path / object tags) |
 | `tts_files.py` | Speech: file-writing TTS (espeak-ng), plays then deletes each file, beep before urgent alerts |
+| `ui.py` | The app window (Tkinter): camera view, text, buttons |
 | `tts_check.py` | Stand-alone audio + TTS test |
 
 Copy updated files from Windows PowerShell:
 
 ```powershell
-scp run_all.py start.sh vlm_loop.py fastpath.py tts_files.py fused_stream.py webcam_detection.py asus@76RH:~/src/
+scp run_all.py start.sh vlm_loop.py fastpath.py tts_files.py fused_stream.py webcam_detection.py ui.py asus@76RH:~/src/
 ```
 
 Check on the GX10:
@@ -64,7 +67,7 @@ chmod +x start.sh
 ### Packages
 
 ```bash
-sudo apt install -y espeak-ng pulseaudio-utils alsa-utils
+sudo apt install -y espeak-ng pulseaudio-utils alsa-utils python3-tk
 source ~/venv/bin/activate
 pip install requests numpy    # plus the team's requirements.txt (ultralytics, opencv, lap, clip, torch, transformers)
 ```
@@ -105,8 +108,8 @@ python tts_check.py                    # beep, speech, interruption, cleanup tes
 What happens:
 
 1. **Checks.** Ollama is reachable and has `gemma3:4b`, espeak-ng and an audio player are installed, the camera exists. If something is missing, it prints the fix and stops.
-2. **Detector.** `webcam_detection.py` starts with the camera window. Its text output goes to `~/src/detector.log`.
-3. **VLM and speech.** When the first fused frame arrives, `vlm_loop.py` starts in your terminal.
+2. **Detector.** `webcam_detection.py` starts (no window of its own); it writes the annotated view to `/dev/shm/annotated.jpg` about 10 times a second. Its text output goes to `~/src/detector.log`.
+3. **VLM, speech and app.** When the first fused frame arrives, `vlm_loop.py --ui` starts and opens the VisionAssist window.
 
 ### Options
 
@@ -116,7 +119,8 @@ What happens:
 ./start.sh --outdoor                     # outdoor metric depth model (streets, cars)
 ./start.sh --mode description            # start in description mode
 ./start.sh --no-tts                      # print sentences instead of speaking
-./start.sh --no-window                   # no camera window (required over SSH)
+./start.sh --no-window                   # no window at all (required over SSH)
+./start.sh --cv-window                   # the detector's plain OpenCV window instead of the app
 ./start.sh --skip-checks                 # start even if a check fails
 ```
 
@@ -148,6 +152,8 @@ tail -f ~/src/detector.log
 | Symptom | Cause / fix |
 |---|---|
 | `could not connect to display` / Qt `xcb` crash | Running over SSH. Run from the GX10 desktop, or add `--no-window` |
+| `No module named tkinter` / plain OpenCV window appears instead of the app | `sudo apt install -y python3-tk` (run_all falls back to the OpenCV window without it) |
+| App shows "Camera feed stopped" | Detector stopped or froze: check `detector.log` |
 | `fuser did not start` | Read the log lines `run_all` prints, or `detector.log` |
 | `Ollama is not reachable` | `ollama serve` or `sudo systemctl start ollama` |
 | No sound at all | `python tts_check.py`; if the beep fails it is the audio device: `pactl set-default-sink` |
@@ -171,6 +177,8 @@ All are constants at the top of the file named.
 | `fastpath.py` | `APPROACH_MPS` (0.3) | Closing speed that counts as approaching |
 | `fastpath.py` | `TAGS`, `RULES` | Object tags: vehicle, ground, overhead, landmark. Add a class name to a tag set to change its rules |
 | `fastpath.py` | `REPEAT_S`, `KIND_REPEAT_S` | How soon the same warning may repeat |
+| `fastpath.py` | `DESC_APPROACH_MPS` (0.8), `DESC_ALERT_ZONE_M` (3.0), `DESC_SUSTAIN_FRAMES` (6) | Description mode: only something closing at ≥0.8 m/s, within 3 m, for 6 frames in a row interrupts. Raise to interrupt less |
+| `fastpath.py` | `DESC_HINT_SKIP` ({"person"}) | Classes left out of the distance list given to the description VLM |
 | `vlm_loop.py` | `MODEL`, `DESCRIBE_MODEL` | VLMs for navigation / description |
 | `vlm_loop.py` | `PROMPT`, `OVERVIEW_PROMPT`, `SECTION_PROMPT`, `MORE_PROMPT` | What the VLM is asked |
 | `vlm_loop.py` | `DESCRIBE_SECTIONS` (True) | Overview + zoomed left/right halves; False = one single description |

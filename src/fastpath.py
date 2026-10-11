@@ -37,6 +37,13 @@ def calibrate(z):
 
 # ---- description mode: set by vlm_loop while the user stands still and listens ----
 DESCRIPTION_MODE = False
+# While the user stands still to listen, only CLEAR, SUSTAINED motion toward them interrupts.
+# Depth jitter makes a person standing still look like they approach at 0.3-0.5 m/s for a
+# frame or two; a person really walking in closes at ~1 m/s and keeps doing it.
+DESC_APPROACH_MPS = 0.8      # closing speed that counts as really coming at the user
+DESC_ALERT_ZONE_M = 3.0      # ...and only this close (corrected distance)
+DESC_SUSTAIN_FRAMES = 6      # ...for this many fuser frames in a row (~0.5 s at 12 fps)
+DESC_HINT_SKIP = {"person"}  # left out of the distance list given to the description VLM
 
 
 def set_description_mode(on):
@@ -134,7 +141,7 @@ def tag_of(cls):
 
 def assess(rec):
     """One fuser record -> list of candidates (urgency, key, text, z, moving). Pure function.
-    moving = the object itself is closing in (approach speed above threshold)."""
+    moving = closing speed in m/s if the object is approaching, else 0.0."""
     out = []
     objs = rec.get("objects") or []
     all_z = []
@@ -149,7 +156,7 @@ def assess(rec):
         z = calibrate(z_raw)
         if o.get("geometry_ok") is False or z is None:
             if cls.lower() in NO_GEOMETRY_CLASSES or r["nogeo"]:
-                out.append((1, (ident, "nogeo"), f"{label} detected, distance unknown.", None, False))
+                out.append((1, (ident, "nogeo"), f"{label} detected, distance unknown.", None, 0.0))
             continue
         all_z.append(z)
         x = _num(o.get("x_m"))
@@ -177,22 +184,22 @@ def assess(rec):
         else:
             will_hit = in_path                       # no lateral history yet: be literal
         if r["ttc_s"] and approaching and ttc is not None and ttc < r["ttc_s"] and will_hit:
-            out.append((3, (ident, "stop"), f"Stop. {label} coming {where}, fast.", z, True))
+            out.append((3, (ident, "stop"), f"Stop. {label} coming {where}, fast.", z, v))
         elif r["ttc_s"] and approaching and not will_hit:
             pass                                     # fast mover that will miss us: stay quiet
         elif in_path and z < r["stop"]:
-            out.append((3, (ident, "stop"), f"Stop. {label} {where}, {dist}.", z, approaching))
+            out.append((3, (ident, "stop"), f"Stop. {label} {where}, {dist}.", z, v if approaching else 0.0))
         elif approaching and z < r["approach_zone"] and (in_path or near_axis):
-            out.append((2, (ident, "approach"), f"{label} {where}, {dist}, approaching.", z, True))
+            out.append((2, (ident, "approach"), f"{label} {where}, {dist}, approaching.", z, v))
         elif in_path and z < r["warn"]:
-            out.append((2, (ident, "path"), f"{label} {where}, {dist}.", z, False))
+            out.append((2, (ident, "path"), f"{label} {where}, {dist}.", z, 0.0))
         elif r["announce"] and z < r["announce"]:
-            out.append((1, (ident, "landmark"), f"{label} {where}, {dist}.", z, False))
+            out.append((1, (ident, "landmark"), f"{label} {where}, {dist}.", z, 0.0))
 
     # Something solid straight ahead that no detected object accounts for (pole, table edge...)
     c = calibrate(_num(rec.get("corridor_min_z_m")))   # same bias assumed; unverified
     if c is not None and c < CORRIDOR_WARN_M and not any(abs(c - z) < 0.5 for z in all_z):
-        out.append((2, ("corridor", "corridor"), f"Obstacle ahead, {dist_text(c, False)}.", c, False))
+        out.append((2, ("corridor", "corridor"), f"Obstacle ahead, {dist_text(c, False)}.", c, 0.0))
     return out
 
 
@@ -207,6 +214,7 @@ class FastPath:
         self.lost = False
         self.lateral = {}            # track id -> (t, x, vx)
         self.latest = None           # (local time, newest record), for scene_summary()
+        self.desc_streak = {}        # candidate key -> consecutive strong frames (description mode)
 
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
@@ -294,10 +302,16 @@ class FastPath:
             return
         cands = sorted(assess(rec), key=lambda c: (-c[0], c[3] if c[3] is not None else 99))
         if DESCRIPTION_MODE:
-            # The user is standing still to listen, so anything still closing in is really
-            # moving toward them: keep those. Static things ("Stop. Person ahead, 1 meter"
-            # for someone standing in front of the camera) would only cut the description.
-            cands = [c for c in cands if c[4]]
+            # The user is standing still to listen: static things ("Stop. Person ahead,
+            # 1 meter" for someone standing in front of the camera) and jitter would only
+            # cut the description. Keep fast, close, sustained approaches and vehicle alerts.
+            strong = {c[1] for c in cands
+                      if c[4] >= DESC_APPROACH_MPS and (c[3] is None or c[3] <= DESC_ALERT_ZONE_M
+                                                        or c[0] >= 3)}
+            self.desc_streak = {k: self.desc_streak.get(k, 0) + 1 for k in strong}
+            cands = [c for c in cands if self.desc_streak.get(c[1], 0) >= DESC_SUSTAIN_FRAMES]
+        else:
+            self.desc_streak = {}
         for urgency, key, text, z, _moving in cands:
             if now - self.last_any < MIN_GAP_S and urgency < 3:
                 continue                              # urgent (3) announcements ignore the gap
@@ -325,7 +339,7 @@ def start(path, submit, priority):
     return fp
 
 
-def scene_summary(max_age_s=1.5, limit=8):
+def scene_summary(max_age_s=1.5, limit=8, skip=DESC_HINT_SKIP):
     """Newest fuser objects as short phrases ("chair, 2 meters, left"), nearest first,
     with the depth calibration applied. Empty if there is no recent record."""
     if _instance is None or _instance.latest is None:
@@ -339,6 +353,8 @@ def scene_summary(max_age_s=1.5, limit=8):
         if o.get("geometry_ok") is False or z is None:
             continue
         cls = str(o.get("class", "object"))
+        if cls.lower() in skip:
+            continue
         items.append((z, f"{cls}, {dist_text(z, bool(o.get('clipped')))}, "
                          f"{direction_word(_num(o.get('bearing_deg')))}"))
     return [text for _, text in sorted(items)[:limit]]
