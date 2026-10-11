@@ -1,0 +1,4 @@
+# Local model weights are downloaded separately and never committed.
+weights/
+**/weights/
+*.pt

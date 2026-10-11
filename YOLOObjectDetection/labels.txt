@@ -1,0 +1,76 @@
+sidewalk curb
+curb ramp
+pothole
+cracked pavement
+uneven sidewalk
+raised pavement slab
+sidewalk step
+staircase
+descending stairs
+tactile paving
+drainage grate
+open manhole
+manhole cover
+puddle
+loose gravel
+fallen branch
+tree root
+speed bump
+pedestrian crosswalk
+construction barricade
+traffic cone
+roadwork sign
+caution tape
+temporary fence
+safety bollard
+parking bollard
+traffic delineator post
+concrete road barrier
+trench
+exposed construction hole
+scaffolding
+construction debris
+road closure gate
+signpost
+utility pole
+streetlight pole
+low hanging branch
+hanging sign
+protruding shelf
+protruding pipe
+open cabinet door
+open door
+glass door
+revolving door
+door threshold
+handrail
+railing
+metal chain barrier
+rope barrier
+pedestrian crossing button
+audible pedestrian signal
+pedestrian signal
+wheelchair ramp
+wheelchair
+white cane
+walking cane
+walker mobility aid
+crutches
+tactile guidance strip
+bus stop sign
+bus shelter
+escalator
+elevator door
+automatic sliding door
+electric scooter
+roller skates
+mobility scooter
+stroller
+shopping cart
+delivery robot
+traffic spike strip
+bicycle rack
+fire escape ladder
+open car door
+truck loading ramp
+gaming mouse
