@@ -23,7 +23,9 @@ Wait until the camera window appears (first start takes about a minute), then ty
 | `m` | Tell me more about the same view, without repeating |
 | `Ctrl+C` | Quit everything (or press `Q` in the camera window) |
 
-Hazard warnings ("Stop. Person ahead, 1 meter.") are on in **both** modes, and they interrupt whatever is being said.
+Hazard warnings ("Stop. Person ahead, 1 meter.") interrupt whatever is being said.
+- **Navigation mode:** all hazards; an alert ends any narration.
+- **Description mode** (user standing still): only things **moving toward the user** interrupt. Static "Stop" lines (e.g. you standing in front of the camera) are held back, and the description **resumes** after an alert, repeating the sentence that was cut.
 
 ---
 
@@ -132,9 +134,10 @@ tail -f ~/src/detector.log
 |---|---|
 | Stand still in view | Short navigation sentences from the VLM |
 | Walk toward the camera | "Person ahead, … approaching", then beep + "Stop. Person ahead, 1 meter." |
-| Type `d` + Enter | "Description mode." then 8–10 sentences, using measured distances |
+| Type `d` + Enter | "Description mode.", an overview, then "On your left, …" and "On your right, …" in detail |
 | Type `m` + Enter | Extra details, no repeats |
-| Walk in during a description | Beep + "Stop" cuts the description off |
+| Stand in front of the camera during a description | Nothing: static objects do not interrupt in description mode |
+| Someone walks toward the camera during a description | "Person ahead, … approaching", then the description continues |
 | Cover the lens | "Camera view blocked." |
 | A traffic light / bus stop in view | Said once, quietly ("Traffic light slightly right, 8 meters.") |
 
@@ -169,7 +172,8 @@ All are constants at the top of the file named.
 | `fastpath.py` | `TAGS`, `RULES` | Object tags: vehicle, ground, overhead, landmark. Add a class name to a tag set to change its rules |
 | `fastpath.py` | `REPEAT_S`, `KIND_REPEAT_S` | How soon the same warning may repeat |
 | `vlm_loop.py` | `MODEL`, `DESCRIBE_MODEL` | VLMs for navigation / description |
-| `vlm_loop.py` | `PROMPT`, `DESCRIBE_PROMPT`, `MORE_PROMPT` | What the VLM is asked |
+| `vlm_loop.py` | `PROMPT`, `OVERVIEW_PROMPT`, `SECTION_PROMPT`, `MORE_PROMPT` | What the VLM is asked |
+| `vlm_loop.py` | `DESCRIBE_SECTIONS` (True) | Overview + zoomed left/right halves; False = one single description |
 | `vlm_loop.py` | `COOLDOWN_S`, `SIMILARITY` | Repeat suppression for VLM sentences |
 | `run_all.py` | `--tts-cmd` default | `espeak-ng -s 165 -w {out} {text}` (`-s` = speaking rate) |
 
@@ -182,6 +186,7 @@ All are constants at the top of the file named.
 - Approach speed lags by a few frames (smoothing), and walking toward a static object also reads as "approaching".
 - Traffic light **colour is never announced**. A wrong "green" is the worst possible error.
 - The VLM can still occasionally invent details, especially in description mode.
+- Description mode assumes the user is standing still: static obstacles are not announced there. Switch back with `n` before walking.
 
 ---
 

@@ -55,6 +55,10 @@ DESCRIBE_MODEL = MODEL      # --describe-model gemma4:26b for richer description
 DESCRIBE_MAX_TOKENS = 450   # roughly 8-10 sentences
 DESCRIBE_MAX_SIDE = 896     # Gemma 3's vision encoder works at 896 px: small text and objects survive
 MORE_MAX_TOKENS = 300
+DESCRIBE_SECTIONS = True    # after the overview, describe the left and right halves as zoomed
+                            # crops: a small VLM sees ~2x the detail and says more
+SECTION_MAX_TOKENS = 260
+SECTION_OVERLAP = 0.10      # each half extends 10% past the middle so nothing on the seam is lost
 USE_FUSED_HINTS = True      # give the model the fuser's measured distances for its objects
 NARRATION_TTL_S = 120.0     # narration sentences wait in order; they do not go stale quickly
 
@@ -94,6 +98,28 @@ DESCRIBE_PROMPT = (
     "For people, say only that a person is there and where; never describe faces, clothing or "
     "names, and never say what anyone is doing or feeling. "
     "Only if the image is completely dark or blank, reply exactly: Camera view unclear."
+)
+
+OVERVIEW_PROMPT = (
+    "You are describing a scene to a blind person who is standing still, is safe, and wants a "
+    "detailed picture of what is in front of them. In 4 to 5 sentences: say what kind of place "
+    "this is, its overall layout and the lighting, then name the main things in view with where "
+    "they are (left, ahead, right; near or far), and end with where the open space or clear path "
+    "is. Details of the left and right sides come later, so keep this an overview. "
+    "Describe only what you can actually see. For people, say only that a person is there and "
+    "where; never describe faces, clothing or names, and never say what anyone is doing. "
+    "Only if the image is completely dark or blank, reply exactly: Camera view unclear."
+)
+
+SECTION_PROMPT = (
+    "This image is the {side} part of the view in front of a blind person. Describe what is in "
+    "it in detail, from nearest to farthest: what each thing is, its size, color, material and "
+    "state (open or closed, on or off, full or empty), and read any text, labels or screens "
+    "word for word. Begin with: On your {side},  Use 3 to 5 sentences. "
+    "Already told the user: \"{told}\" Do not repeat that; add new details only. "
+    "Only describe what you can actually see. For people, say only that a person is there; "
+    "never describe faces, clothing or names. If there is nothing new to add, reply exactly: "
+    "Nothing more on the {side}."
 )
 
 MORE_PROMPT = (
@@ -269,13 +295,16 @@ def told_recently(n=2):
 # ---------- speech + prioritizer ----------
 TTS = None                # set in main() from --tts-cmd (tts_files.FileTTS)
 
-def speak(text, cancel=None):
+URGENT_PRIORITY = 2.25    # fast-path urgency 3 arrives as HAZARD + 0.3 = 2.3: beep first
+
+
+def speak(text, cancel=None, priority=0):
     """Speak one sentence. `cancel` is an Event: if it gets set, stop talking immediately.
     Real TTS: start Piper/Kokoro/espeak-ng as a subprocess (Popen), poll `cancel`
     while it runs, and call proc.terminate() if it is set."""
     print(f"[SPEAK] {text}")
     if TTS is not None:
-        status = TTS.speak(text, cancel)
+        status = TTS.speak(text, cancel, urgent=priority >= URGENT_PRIORITY)
         if status == "cancelled":
             print("[interrupted]")
         return
@@ -306,6 +335,8 @@ class Speaker:
         self.current_priority = 0
         self.current_kind = None
         self.cancel = threading.Event()
+        self.resume_narration = False   # description mode: an alert PAUSES the narration
+        self._drop_current = False      # set by stop_narration(): do not resume this sentence
         threading.Thread(target=self._run, daemon=True).start()
 
     def submit(self, text, priority=INFO, ttl=INFO_TTL_S, dedupe=True):
@@ -316,8 +347,8 @@ class Speaker:
                 return "outranked"
             replaced = self.pending is not None
             self.pending = (priority, text, time.time(), ttl, "alert" if priority > INFO else "info")
-            if priority > INFO and self.backlog:
-                self.backlog.clear()         # anything urgent ends a narration in progress
+            if priority > INFO and self.backlog and not self.resume_narration:
+                self.backlog.clear()         # navigation: anything urgent ends a narration
                 if TTS is not None:
                     TTS.discard()
             if self.speaking and priority > self.current_priority:
@@ -333,6 +364,8 @@ class Speaker:
     def stop_narration(self):
         with self.cv:
             self.backlog.clear()
+            if self.current_kind == "narration":
+                self._drop_current = True
             if TTS is not None:
                 TTS.discard()
             if self.speaking and self.current_kind == "narration":
@@ -357,13 +390,19 @@ class Speaker:
                 self.speaking = True
                 self.current_priority = priority
                 self.current_kind = kind
+                self._drop_current = False
                 self.cancel.clear()
             if time.time() - created > ttl:
                 print(f"[dropped stale] {text}")
             else:
                 mark_spoken(text)
-                speak(text, self.cancel)
+                speak(text, self.cancel, priority)
             with self.cv:
+                if (kind == "narration" and self.cancel.is_set() and self.resume_narration
+                        and not self._drop_current):
+                    # cut off by an alert: say this sentence again once the alert is done
+                    self.backlog.appendleft((priority, text, time.time(), ttl, kind))
+                    print("(narration paused for an alert; will resume)")
                 self.speaking = False
                 self.current_priority = 0
                 self.current_kind = None
@@ -409,6 +448,12 @@ def set_mode(new):
     with _mode_lock:
         changed = new != _mode
         _mode = new
+    speaker.resume_narration = new == DESCRIBE
+    try:
+        import fastpath
+        fastpath.set_description_mode(new == DESCRIBE)
+    except Exception:
+        pass
     if changed:
         speaker.stop_narration()
         speaker.submit(f"{new.capitalize()} mode.", priority=HAZARD, ttl=3.0, dedupe=False)
@@ -518,6 +563,13 @@ def _stream_description(frame, prompt, messages=None, max_tokens=DESCRIBE_MAX_TO
     def is_fallback(sentence):
         return n == 0 and sentence.lower().startswith("camera view unclear")
 
+    def say(sentence):
+        if sentence.lower().startswith(("nothing more on the", "that is everything")) and n > 0:
+            return False
+        speaker.narrate(sentence)
+        spoken.append(sentence)
+        return True
+
     payload = _payload(frame, prompt, max_tokens, DESCRIBE_MODEL, DESCRIBE_MAX_SIDE, messages)
     if messages is None:
         last_description.clear()
@@ -536,8 +588,9 @@ def _stream_description(frame, prompt, messages=None, max_tokens=DESCRIBE_MAX_TO
                 sentence = m.group(1).strip()
                 if is_fallback(sentence):
                     return "unclear"
-                speaker.narrate(sentence)
-                spoken.append(sentence)
+                if not say(sentence):
+                    buf = buf[m.end():]
+                    continue
                 n += 1
                 if n == 1:
                     print(f"(first description sentence after {time.time() - t0:.2f}s)")
@@ -547,9 +600,8 @@ def _stream_description(frame, prompt, messages=None, max_tokens=DESCRIBE_MAX_TO
                 if tail[-1:] in (".", "!", "?"):
                     if is_fallback(tail):
                         return "unclear"
-                    speaker.narrate(tail)
-                    spoken.append(tail)
-                    n += 1
+                    if say(tail):
+                        n += 1
                 break
     if messages is None:
         last_description["text"] = " ".join(spoken)
@@ -569,7 +621,11 @@ def describe_long(frame):
     if float(t.mean()) < DARK_THRESHOLD:
         speaker.submit("Camera view blocked.", priority=HAZARD, ttl=3.0, dedupe=False)
         return
-    result = _stream_description(frame, DESCRIBE_PROMPT + fused_hint())
+    prompt = (OVERVIEW_PROMPT if DESCRIBE_SECTIONS else DESCRIBE_PROMPT) + fused_hint()
+    result = _stream_description(frame, prompt)
+    if result == "ok" and DESCRIBE_SECTIONS:
+        _describe_sections(frame)
+        return
     if result == "unclear" and float(t.std()) >= FLAT_THRESHOLD:
         print(f"(model said unclear on a normal-looking frame "
               f"[brightness {t.mean():.0f}, contrast {t.std():.0f}]; retrying with the simple prompt)")
@@ -578,6 +634,25 @@ def describe_long(frame):
         print(f"(still unclear [brightness {t.mean():.0f}, contrast {t.std():.0f}]; "
               f"check last_described.jpg)")
         speaker.narrate("Camera view unclear.")
+
+
+def _describe_sections(frame):
+    """Left and right halves as zoomed crops, each told what was already said.
+    Generation of the next part overlaps with speaking the previous one."""
+    h, w = frame.shape[:2]
+    half = w // 2
+    pad = int(w * SECTION_OVERLAP)
+    crops = [("left", frame[:, :half + pad]), ("right", frame[:, half - pad:])]
+    for side, crop in crops:
+        if current_mode() != DESCRIBE or describe_request.is_set() or more_request.is_set():
+            return
+        told = last_description.get("text", "")[-600:].replace('"', "'")
+        prompt = SECTION_PROMPT.format(side=side, told=told)
+        messages = [{"role": "user", "content": prompt,
+                     "images": [to_b64_jpeg(downscale(crop, DESCRIBE_MAX_SIDE))]}]
+        if _stream_description(None, None, messages=messages,
+                               max_tokens=SECTION_MAX_TOKENS) == "cancelled":
+            return
 
 
 def describe_more():

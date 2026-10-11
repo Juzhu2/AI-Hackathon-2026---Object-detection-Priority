@@ -35,6 +35,15 @@ def calibrate(z):
     return None if z is None else max(MIN_Z_M, DEPTH_SCALE * z + DEPTH_OFFSET_M)
 
 
+# ---- description mode: set by vlm_loop while the user stands still and listens ----
+DESCRIPTION_MODE = False
+
+
+def set_description_mode(on):
+    global DESCRIPTION_MODE
+    DESCRIPTION_MODE = bool(on)
+
+
 # ---- tunable rules (meters, m/s, seconds). Tune these on recorded real data. ----
 PATH_HALF_WIDTH_M = 0.7    # |x_m| below this = in the user's walking path
 STOP_ZONE_M = 1.5          # in path and closer than this = urgent
@@ -124,7 +133,8 @@ def tag_of(cls):
 
 
 def assess(rec):
-    """One fuser record -> list of candidates (urgency, key, text, z). Pure function."""
+    """One fuser record -> list of candidates (urgency, key, text, z, moving). Pure function.
+    moving = the object itself is closing in (approach speed above threshold)."""
     out = []
     objs = rec.get("objects") or []
     all_z = []
@@ -139,7 +149,7 @@ def assess(rec):
         z = calibrate(z_raw)
         if o.get("geometry_ok") is False or z is None:
             if cls.lower() in NO_GEOMETRY_CLASSES or r["nogeo"]:
-                out.append((1, (ident, "nogeo"), f"{label} detected, distance unknown.", None))
+                out.append((1, (ident, "nogeo"), f"{label} detected, distance unknown.", None, False))
             continue
         all_z.append(z)
         x = _num(o.get("x_m"))
@@ -167,22 +177,22 @@ def assess(rec):
         else:
             will_hit = in_path                       # no lateral history yet: be literal
         if r["ttc_s"] and approaching and ttc is not None and ttc < r["ttc_s"] and will_hit:
-            out.append((3, (ident, "stop"), f"Stop. {label} coming {where}, fast.", z))
+            out.append((3, (ident, "stop"), f"Stop. {label} coming {where}, fast.", z, True))
         elif r["ttc_s"] and approaching and not will_hit:
             pass                                     # fast mover that will miss us: stay quiet
         elif in_path and z < r["stop"]:
-            out.append((3, (ident, "stop"), f"Stop. {label} {where}, {dist}.", z))
+            out.append((3, (ident, "stop"), f"Stop. {label} {where}, {dist}.", z, approaching))
         elif approaching and z < r["approach_zone"] and (in_path or near_axis):
-            out.append((2, (ident, "approach"), f"{label} {where}, {dist}, approaching.", z))
+            out.append((2, (ident, "approach"), f"{label} {where}, {dist}, approaching.", z, True))
         elif in_path and z < r["warn"]:
-            out.append((2, (ident, "path"), f"{label} {where}, {dist}.", z))
+            out.append((2, (ident, "path"), f"{label} {where}, {dist}.", z, False))
         elif r["announce"] and z < r["announce"]:
-            out.append((1, (ident, "landmark"), f"{label} {where}, {dist}.", z))
+            out.append((1, (ident, "landmark"), f"{label} {where}, {dist}.", z, False))
 
     # Something solid straight ahead that no detected object accounts for (pole, table edge...)
     c = calibrate(_num(rec.get("corridor_min_z_m")))   # same bias assumed; unverified
     if c is not None and c < CORRIDOR_WARN_M and not any(abs(c - z) < 0.5 for z in all_z):
-        out.append((2, ("corridor", "corridor"), f"Obstacle ahead, {dist_text(c, False)}.", c))
+        out.append((2, ("corridor", "corridor"), f"Obstacle ahead, {dist_text(c, False)}.", c, False))
     return out
 
 
@@ -283,7 +293,12 @@ class FastPath:
             self._say("Distance sensing restored.")
             return
         cands = sorted(assess(rec), key=lambda c: (-c[0], c[3] if c[3] is not None else 99))
-        for urgency, key, text, z in cands:
+        if DESCRIPTION_MODE:
+            # The user is standing still to listen, so anything still closing in is really
+            # moving toward them: keep those. Static things ("Stop. Person ahead, 1 meter"
+            # for someone standing in front of the camera) would only cut the description.
+            cands = [c for c in cands if c[4]]
+        for urgency, key, text, z, _moving in cands:
             if now - self.last_any < MIN_GAP_S and urgency < 3:
                 continue                              # urgent (3) announcements ignore the gap
             prev = self.last_warn.get(key)
