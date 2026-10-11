@@ -7,8 +7,14 @@ import re
 
 
 @contextmanager
-def tracking_config(profile, buffer=None):
-    """Use installed defaults for baseline; materialize overrides for this run only."""
+def tracking_config(profile, buffer=None, confidence=None):
+    """Use installed defaults for baseline; materialize overrides for this run only.
+
+    If `confidence` is given, the tracker's score thresholds are lowered to match it.
+    BoT-SORT only starts tracks from detections scoring >= new_track_thresh /
+    track_high_thresh (default 0.25), so without this, detections between
+    --confidence and 0.25 are silently ignored by the tracker.
+    """
     from ultralytics.utils import ROOT, YAML
 
     root = Path(__file__).resolve().parent
@@ -18,6 +24,11 @@ def tracking_config(profile, buffer=None):
         config["with_reid"] = False
     if buffer is not None:
         config["track_buffer"] = buffer
+    if confidence is not None:
+        # Only ever lower the thresholds, never raise them above the file's values.
+        config["track_high_thresh"] = min(config.get("track_high_thresh", 0.25), confidence)
+        config["new_track_thresh"] = min(config.get("new_track_thresh", 0.25), confidence)
+        config["track_low_thresh"] = min(config.get("track_low_thresh", 0.1), confidence / 2)
     # A separate effective file prevents changing source configuration between runs.
     with TemporaryDirectory(prefix=".tracking-", dir=root) as folder:
         effective = Path(folder) / "botsort.yaml"

@@ -8,6 +8,8 @@ sidewalk step
 staircase
 descending stairs
 tactile paving
+computer mouse
+staircase
 drainage grate
 open manhole
 manhole cover
