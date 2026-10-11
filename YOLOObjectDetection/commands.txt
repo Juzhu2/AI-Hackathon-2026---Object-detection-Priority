@@ -1,0 +1,7 @@
+Run the fast path:
+python webcam_detection.py --depth --depth-mode indoor --fuse --no-display --json-output /dev/shm/fused.jsonl --json-truncate-every 5000 --frame-out /dev/shm/latest.jpg
+
+Run slow path detection:
+python vlm_loop.py --frame-file /dev/shm/latest.jpg --fused /dev/shm/fused.jsonl
+
+
