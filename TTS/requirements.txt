@@ -1,0 +1,5 @@
+kokoro>=0.9.4,<0.10
+soundfile>=0.13,<0.14
+numpy>=1.26,<3
+# Kokoro 0.9.4 uses Transformers 4 APIs; avoid incompatible Transformers 5.
+transformers>=4.48,<5

@@ -8,6 +8,32 @@ VisionAssist aims to turn live camera footage into timely spoken descriptions by
 
 The YOLOdetection branch includes a simple desktop webcam demo using YOLO26 or YOLO-World, selected by the model setting, and OpenCV. It uses BoT-SORT to track separate objects and displays bounding boxes, track IDs, object labels, and confidence scores. Depth estimation, prioritization, speech, and the browser backend remain planned.
 
+## Kokoro text-to-speech demo (TTS branch)
+
+The standalone script `TTS/kokoro_tts.py` reads `TTS/inputtest.txt` and writes spoken audio to `TTS/output/output.wav`. Edit the text file, then run these commands from the repository root:
+
+```powershell
+python -m venv TTS/.venv
+.\TTS\.venv\Scripts\python.exe -m pip install -r TTS/requirements.txt
+.\TTS\.venv\Scripts\python.exe TTS/kokoro_tts.py
+```
+
+The TTS requirements constrain Transformers to version 4 for Kokoro 0.9.4 compatibility. Use the separate environment above to avoid changing the detector environment. It uses Kokoro's `af_heart` American English voice on the CPU and combines every generated chunk into one mono, 24 kHz WAV file. Open `TTS/output/output.wav` in an audio player to listen. Rerunning the script replaces that output file.
+
+Optional input/output paths and speech speed:
+
+```powershell
+.\TTS\.venv\Scripts\python.exe TTS/kokoro_tts.py --input TTS/inputtest.txt --output TTS/output/message.wav --speed 1.1
+```
+
+Default paths are relative to the script, so `cd TTS` followed by `.\.venv\Scripts\python.exe kokoro_tts.py` also works. Explicit paths are relative to your terminal's current directory. Use an American English voice with this demo's `lang_code='a'`.
+
+The first run needs internet access to download Kokoro model/voice assets and any missing English language resources. By default, Hugging Face assets are cached in `TTS/weights/huggingface/` (an existing `HF_HOME` environment variable takes precedence). Subsequent runs can use cached assets locally after setup. All files inside `TTS/output/`, along with downloaded weights, are excluded from Git. The script creates the output folder automatically when needed.
+
+On Windows, install [eSpeak NG](https://github.com/espeak-ng/espeak-ng/releases) for English pronunciation fallback, especially unfamiliar words. Kokoro may warn and skip unknown words when that fallback is unavailable. The implementation follows the [official Kokoro Python usage](https://github.com/hexgrad/kokoro). This standalone demo is separate from the planned Piper integration.
+
+Files: `TTS/kokoro_tts.py` (script), `TTS/inputtest.txt` (editable text), `TTS/requirements.txt` (dependencies), and `TTS/.gitignore` (local assets).
+
 ## Run the webcam demo
 
 Use Python 3.10 or newer and Git (needed to install the CLIP dependency) on a computer with a camera and desktop display. From the repository root, enter the application folder and run:
