@@ -78,7 +78,7 @@ class GeometryFuser:
             track_id = item.get("track_id")
             depth = item.get("depth")
             usable = (depth is not None and depth.get("unit") == "m"
-                      and math.isfinite(depth["value"]) and depth["value"] > 0)
+                      and math.isfinite(depth["value"]) and depth["value"] >= 0)
 
             if not usable:
                 no_geometry += 1

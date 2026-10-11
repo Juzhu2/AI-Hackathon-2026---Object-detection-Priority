@@ -224,7 +224,7 @@ def main():
         label_caches = {name: {} for name, _ in detectors}
         depth_est = None
         if args.depth:
-            from depth_utils import (CORRIDOR_COLS, CORRIDOR_ROWS, DepthEstimator, add_depth,
+            from depth_utils import (CORRIDOR_COLS, CORRIDOR_ROWS, METRIC_DISTANCE_OFFSET_M, DepthEstimator, add_depth,
                                      colorize, corridor_min_depth, draw_depth)
 
             depth_est = DepthEstimator(args.depth_size, args.depth_mode, device,
@@ -258,7 +258,8 @@ def main():
                     "imgsz": args.imgsz,
                     "source": str(args.source) if args.source else f"camera:{args.camera}"}
         metadata["depth"] = (
-            {"model": depth_est.model_id, "mode": args.depth_mode, "every": args.depth_every}
+            {"model": depth_est.model_id, "mode": args.depth_mode, "every": args.depth_every,
+             "distance_offset_m": METRIC_DISTANCE_OFFSET_M if args.depth_mode != "relative" else 0.0}
             if depth_est else None
         )
         metadata["geometry"] = {"hfov_deg": args.hfov} if fuser else None
@@ -300,7 +301,9 @@ def main():
                     "input_size": args.depth_input_size, "run_every_n_frames": args.depth_every,
                     "calibration": {
                         "status": "uncalibrated", "validated_against": None,
-                        "note": "Pretrained Depth Anything V2 metric model used as-is, with no "
+                        "distance_offset_m": METRIC_DISTANCE_OFFSET_M,
+                        "note": "Pretrained Depth Anything V2 metric model with a 1 m subtraction "
+                                "clamped at zero, with no "
                                 "per-camera or per-scene calibration. Accuracy has not been "
                                 "measured on this camera; check against a tape measure before "
                                 "relying on absolute values."}},
