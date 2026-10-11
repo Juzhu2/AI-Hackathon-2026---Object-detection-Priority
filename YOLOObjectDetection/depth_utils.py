@@ -106,6 +106,28 @@ def add_depth(record, depth_map, frame_shape, mode):
     return record
 
 
+# Strip straight ahead of the user, as fractions of the depth map (columns, rows).
+# At 2 m with a 70 degree camera the central 20% of the width is about 0.56 m wide.
+CORRIDOR_COLS = (0.40, 0.60)
+CORRIDOR_ROWS = (0.20, 0.65)  # upper-middle band: skips most of the floor in the lower part
+
+
+def corridor_min_depth(depth_map, mode, cols=CORRIDOR_COLS, rows=CORRIDOR_ROWS, percentile=5):
+    """Nearest depth (meters) in the strip straight ahead, with no class needed.
+
+    Uses the 5th percentile instead of the absolute minimum so one noisy pixel cannot
+    trigger it. Returns None for relative depth, which has no meters. It will miss
+    obstacles below the band (low tables, curbs) because we do not model the floor.
+    """
+    if mode == "relative":
+        return None
+    dh, dw = depth_map.shape
+    strip = depth_map[int(dh * rows[0]):max(int(dh * rows[1]), int(dh * rows[0]) + 1),
+                      int(dw * cols[0]):max(int(dw * cols[1]), int(dw * cols[0]) + 1)]
+    value = float(np.percentile(strip, percentile))
+    return round(value, 3) if np.isfinite(value) and value > 0 else None
+
+
 def colorize(depth_map, frame_shape, mode):
     """Colorized depth image at frame size. Near = bright/warm."""
     values = depth_map if mode == "relative" else -depth_map

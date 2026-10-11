@@ -224,27 +224,19 @@ def main():
         label_caches = {name: {} for name, _ in detectors}
         depth_est = None
         if args.depth:
-            from depth_utils import DepthEstimator, add_depth, colorize, draw_depth
+            from depth_utils import (CORRIDOR_COLS, CORRIDOR_ROWS, DepthEstimator, add_depth,
+                                     colorize, corridor_min_depth, draw_depth)
 
             depth_est = DepthEstimator(args.depth_size, args.depth_mode, device,
                                        use_half, args.depth_input_size)
             print(f"Depth model: {depth_est.model_id} ({args.depth_mode})")
         fuser = None
         if args.fuse:
-            from geometry_fuser import GeometryFuser
-
-            from geometry_fuser import format_table
+            from geometry_fuser import GeometryFuser, format_table
 
             fuser = GeometryFuser(args.hfov)
             print(f"Geometry fuser on (hfov={args.hfov} deg).")
         clean_writer = None
-        if args.clean_json:
-            from geometry_fuser import CleanJsonWriter
-
-            args.clean_json.parent.mkdir(parents=True, exist_ok=True)
-            clean_writer = CleanJsonWriter(args.clean_json)
-            resources.callback(clean_writer.close)  # closes the JSON array on exit or Ctrl+C
-            print(f"Writing clean JSON to {args.clean_json}")
         prioritizer = speak_queue = None
         if args.speak:
             from prioritizer import Prioritizer, UtteranceQueue, make_pyttsx3_speaker
@@ -290,6 +282,52 @@ def main():
             actual_h = int(camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
             print(f"Camera resolution: {actual_w}x{actual_h}")
 
+        if args.clean_json:
+            from geometry_fuser import CleanJsonWriter
+
+            frame_w = int(camera.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_h = int(camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            meta = {
+                "schema": "visionassist.fused/2",
+                "units": "meters, degrees, seconds",
+                "coordinates": "camera frame: x right+, y up+, z forward along the optical axis; "
+                               "bearing right+",
+                "camera": {"width": frame_w, "height": frame_h, "hfov_deg": args.hfov,
+                           "intrinsics_calibrated": False,
+                           "note": "hfov is an assumed value; pinhole model, square pixels"},
+                "depth": {
+                    "model": depth_est.model_id, "mode": args.depth_mode,
+                    "input_size": args.depth_input_size, "run_every_n_frames": args.depth_every,
+                    "calibration": {
+                        "status": "uncalibrated", "validated_against": None,
+                        "note": "Pretrained Depth Anything V2 metric model used as-is, with no "
+                                "per-camera or per-scene calibration. Accuracy has not been "
+                                "measured on this camera; check against a tape measure before "
+                                "relying on absolute values."}},
+                "detectors": [name for name, _ in detectors],
+                "detector_confidence_floor": args.confidence,
+                "track_id_note": "YOLO-World track ids start at 100000",
+                "smoothing": fuser.describe(),
+                "corridor": {
+                    "field": "corridor_min_z_m",
+                    "definition": "5th-percentile metric depth inside a strip straight ahead; "
+                                  "no class needed. Misses obstacles below the strip.",
+                    "columns_fraction": list(CORRIDOR_COLS), "rows_fraction": list(CORRIDOR_ROWS)},
+                "clock": {
+                    "t": "seconds since the script started (or video time with --source)",
+                    "capture_unix_s": "time.time() just after the frame was read; wall clock, "
+                                      "comparable across machines if their clocks are synced",
+                    "capture_monotonic_s": "time.monotonic() at the same moment; comparable only "
+                                           "between processes on this machine",
+                    "latency_ms": "capture to fused record ready (before the prioritizer); excludes "
+                                  "camera and driver buffering before read() returned"},
+                "frames": "one entry per processed frame, including frames with no objects",
+            }
+            args.clean_json.parent.mkdir(parents=True, exist_ok=True)
+            clean_writer = CleanJsonWriter(args.clean_json, meta)
+            resources.callback(clean_writer.close)  # finishes the JSON on exit or Ctrl+C
+            print(f"Writing clean JSON to {args.clean_json}")
+
         if not args.no_display:
             cv2.namedWindow(window, cv2.WINDOW_NORMAL)
         frame_index = 0
@@ -300,6 +338,7 @@ def main():
         last_said = ("", -1e9)  # (text, record time) for the on-screen caption
         while True:
             success, frame = camera.read()
+            captured_unix, captured_mono = time.time(), time.monotonic()
             if not success:
                 if args.source:
                     break
@@ -331,13 +370,17 @@ def main():
                  for name, res in results],
                 [name for name, _ in results],
             )
+            record["capture_unix_s"] = round(captured_unix, 3)
+            record["capture_monotonic_s"] = round(captured_mono, 3)
             if depth_est is not None:
                 depth_started = time.perf_counter()
                 if depth_map is None or frame_index % args.depth_every == 0:
                     depth_map = depth_est.predict(frame)
                 add_depth(record, depth_map, frame.shape, depth_est.mode)
+                record["corridor_min_z_m"] = corridor_min_depth(depth_map, depth_est.mode)
                 if fuser is not None:
                     fuser.update(record, frame.shape)
+                    record["latency_ms"] = (time.monotonic() - captured_mono) * 1000
                     if args.table:
                         print(format_table(record), end="\n\n")
                     if clean_writer is not None:
