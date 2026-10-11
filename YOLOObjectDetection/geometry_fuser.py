@@ -7,6 +7,8 @@ Every object in a frame record gets item["geometry"], a dict that is ALWAYS pres
     "y_m":           above the camera axis (+) / below (-)
     "z_m":           forward distance along the optical axis (smoothed for tracked objects)
     "range_m":       straight-line distance sqrt(x^2 + y^2 + z^2)
+    "width_m":       object width in meters at its smoothed depth (pinhole model); the fast path
+                    uses it to see whether an object's EDGE overlaps the walking path
     "bearing_deg":   horizontal angle, + = right of center
     "elevation_deg": vertical angle, + = above center
     "approach_mps":  closing speed, + = getting closer. None until the track has
@@ -85,6 +87,7 @@ class GeometryFuser:
                 item["depth_rank"] = None
                 item["geometry"] = {
                     "ok": False, "x_m": None, "y_m": None, "z_m": None, "range_m": None,
+                    "width_m": None,
                     "bearing_deg": None, "elevation_deg": None, "approach_mps": None,
                     "age_frames": self.tracks[track_id]["n"] if track_id in self.tracks else None,
                     "clipped_edges": clipped,
@@ -106,6 +109,7 @@ class GeometryFuser:
                 "y_m": round(y, 3),
                 "z_m": round(z, 3),
                 "range_m": round(math.sqrt(x * x + y * y + z * z), 3),
+                "width_m": round((x2 - x1) * z / fx, 3),
                 "bearing_deg": round(math.degrees(math.atan2(x, z)), 1),
                 "elevation_deg": round(math.degrees(math.atan2(y, z)), 1),
                 "approach_mps": None if approach is None else round(approach, 3),
@@ -177,6 +181,7 @@ def clean_record(record):
             "conf": round(item["confidence"], 2), "rank": item.get("depth_rank"),
             "geometry_ok": geo["ok"], "age_frames": geo["age_frames"],
             "range_m": geo["range_m"], "x_m": geo["x_m"], "y_m": geo["y_m"], "z_m": geo["z_m"],
+            "width_m": geo.get("width_m"),
             "bearing_deg": geo["bearing_deg"], "direction": direction_word(geo["bearing_deg"]),
             "approach_mps": geo["approach_mps"], "clipped": geo["clipped_edges"],
         })

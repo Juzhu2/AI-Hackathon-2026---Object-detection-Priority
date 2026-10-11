@@ -2,9 +2,14 @@
 
 Default mode "both": YOLO26 detects its trained (COCO) classes and YOLO-World adds
 the extra objects from labels.txt that COCO does not have (e.g. staircase).
+
+To feed vlm_loop.py (fast path + VLM in a second process), add:
+    --json-output /dev/shm/fused.jsonl --frame-out /dev/shm/latest.jpg
+and do NOT pass --speak (vlm_loop.py does the speaking).
 """
 
 import argparse
+import os
 import sys
 import json
 import time
@@ -78,7 +83,8 @@ def merge_records(records, names):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--camera", type=int, default=0, help="Camera index (default: 0)")
     parser.add_argument("--model", default=None, help="Weights name or local path (default depends on --model-type)")
     parser.add_argument("--labels", type=Path, default=DEFAULT_LABELS, help="YOLO-World only: TXT file with one object name per line")
@@ -112,7 +118,8 @@ def parse_args():
     parser.add_argument("--hfov", type=float, default=70.0,
                         help="Camera horizontal field of view in degrees (default: 70)")
     parser.add_argument("--speak", action="store_true",
-                        help="Run the prioritizer and print what would be spoken (needs --fuse)")
+                        help="Run the prioritizer and print what would be spoken (needs --fuse). "
+                             "Do not combine with vlm_loop.py: hazards would be spoken twice")
     parser.add_argument("--tts", action="store_true",
                         help="With --speak: also read utterances aloud (pip install pyttsx3)")
     parser.add_argument("--width", type=int, default=1280, help="Requested webcam capture width")
@@ -126,7 +133,18 @@ def parse_args():
     parser.add_argument("--track-buffer", type=int, help="Override lost-track buffer in processed frames")
     parser.add_argument("--detect-only", action="store_true", help="Run detector independently without tracker")
     parser.add_argument("--no-display", action="store_true", help="Process without a desktop window")
-    parser.add_argument("--json-output", type=Path, help="Write session metadata and frame records as JSON Lines")
+    parser.add_argument("--json-output", type=Path,
+                        help="Write session metadata and frame records as JSON Lines "
+                             "(flushed after every record so vlm_loop.py can follow it live)")
+    parser.add_argument("--json-truncate-every", type=int, default=0,
+                        help="Empty the --json-output file every N frames (0 = never). Use with a "
+                             "RAM disk such as /dev/shm so the file does not grow forever; "
+                             "vlm_loop.py's fast path follows the truncation. Loses the session log.")
+    parser.add_argument("--frame-out", type=Path,
+                        help="Save the newest raw frame here for vlm_loop.py --frame-file "
+                             "(e.g. /dev/shm/latest.jpg). Written atomically.")
+    parser.add_argument("--frame-out-every", type=int, default=3,
+                        help="Save a frame every N processed frames (default: 3)")
     parser.add_argument("--debug", action="store_true", help="Log per-frame classes, IDs, confidence, counts, and FPS")
     args = parser.parse_args()
     if not 0 <= args.confidence <= 1:
@@ -145,6 +163,12 @@ def parse_args():
         parser.error("--tts requires --speak")
     if args.imgsz < 32:
         parser.error("--imgsz must be at least 32")
+    if args.frame_out_every < 1:
+        parser.error("--frame-out-every must be positive")
+    if args.json_truncate_every < 0:
+        parser.error("--json-truncate-every cannot be negative")
+    if args.json_truncate_every and not args.json_output:
+        parser.error("--json-truncate-every requires --json-output")
     # Pick the default weights for the chosen model type.
     # --model is the YOLO26 weights in yolo26/both mode, and the YOLO-World weights in world mode.
     if args.model is None:
@@ -268,6 +292,9 @@ def main():
             args.json_output.parent.mkdir(parents=True, exist_ok=True)
             output = resources.enter_context(args.json_output.open("w", encoding="utf-8"))
             output.write(json.dumps(metadata) + "\n")
+            output.flush()
+        if args.frame_out:
+            args.frame_out.parent.mkdir(parents=True, exist_ok=True)
         camera = cv2.VideoCapture(str(args.source) if args.source else args.camera)
         if not camera.isOpened():
             raise RuntimeError(
@@ -363,6 +390,14 @@ def main():
             fps = instant_fps if frame_index == 0 else 0.9 * fps + 0.1 * instant_fps
             previous = finished
             frame_index += 1
+
+            # Share the raw frame with vlm_loop.py. Atomic: write a temp file ending in .jpg
+            # (so OpenCV picks the encoder), then os.replace() so the reader never sees half a file.
+            if args.frame_out and frame_index % args.frame_out_every == 0:
+                tmp = args.frame_out.with_name(args.frame_out.stem + ".tmp.jpg")
+                cv2.imwrite(str(tmp), frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                os.replace(tmp, args.frame_out)
+
             timestamp = camera.get(cv2.CAP_PROP_POS_MSEC) / 1000 if args.source else finished - started
             latency_ms = (finished - inference_started) * 1000
             record = merge_records(
@@ -402,6 +437,10 @@ def main():
                 runtime_logged = True
             if output:
                 output.write(json.dumps(record) + "\n")
+                output.flush()  # without this the follower sees data in ~8 KB bursts, seconds late
+                if args.json_truncate_every and frame_index % args.json_truncate_every == 0:
+                    output.seek(0)
+                    output.truncate()  # RAM-disk hygiene; fastpath.py detects the shrink and restarts
             if args.debug:
                 print(json.dumps(record))
             if args.no_display:

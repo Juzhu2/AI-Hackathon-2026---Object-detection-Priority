@@ -76,3 +76,10 @@ fire escape ladder
 open car door
 truck loading ramp
 gaming mouse
+staircase
+curb
+pole
+bollard
+glass door
+pothole
+traffic cone

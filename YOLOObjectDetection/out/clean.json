@@ -1,0 +1,3147 @@
+{
+  "meta": {
+    "schema": "visionassist.fused/2",
+    "units": "meters, degrees, seconds",
+    "coordinates": "camera frame: x right+, y up+, z forward along the optical axis; bearing right+",
+    "camera": {
+      "width": 1280,
+      "height": 720,
+      "hfov_deg": 70.0,
+      "intrinsics_calibrated": false,
+      "note": "hfov is an assumed value; pinhole model, square pixels"
+    },
+    "depth": {
+      "model": "depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf",
+      "mode": "indoor",
+      "input_size": 518,
+      "run_every_n_frames": 1,
+      "calibration": {
+        "status": "uncalibrated",
+        "validated_against": null,
+        "note": "Pretrained Depth Anything V2 metric model used as-is, with no per-camera or per-scene calibration. Accuracy has not been measured on this camera; check against a tape measure before relying on absolute values."
+      }
+    },
+    "detectors": [
+      "yolo26",
+      "world"
+    ],
+    "detector_confidence_floor": 0.15,
+    "track_id_note": "YOLO-World track ids start at 100000",
+    "smoothing": {
+      "median_window_frames": 5,
+      "ema_alpha": 0.4,
+      "min_approach_frames": 4,
+      "forget_track_after_frames": 30,
+      "edge_margin_px": 8,
+      "method": "median(window) -> EMA(alpha) on z; approach = EMA(alpha) of -dz/dt"
+    },
+    "corridor": {
+      "field": "corridor_min_z_m",
+      "definition": "5th-percentile metric depth inside a strip straight ahead; no class needed. Misses obstacles below the strip.",
+      "columns_fraction": [
+        0.4,
+        0.6
+      ],
+      "rows_fraction": [
+        0.2,
+        0.65
+      ]
+    },
+    "clock": {
+      "t": "seconds since the script started (or video time with --source)",
+      "capture_unix_s": "time.time() just after the frame was read; wall clock, comparable across machines if their clocks are synced",
+      "capture_monotonic_s": "time.monotonic() at the same moment; comparable only between processes on this machine",
+      "latency_ms": "capture to fused record ready (before the prioritizer); excludes camera and driver buffering before read() returned"
+    },
+    "frames": "one entry per processed frame, including frames with no objects"
+  },
+  "frames": [
+    {
+      "frame": 1,
+      "t": 1.18,
+      "capture_unix_s": 1791688276.541,
+      "capture_monotonic_s": 820176.437,
+      "latency_ms": 1156.0,
+      "fps": 0.9,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.408,
+      "objects": [
+        {
+          "id": 2,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.65,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 1.766,
+          "x_m": 0.961,
+          "y_m": -0.458,
+          "z_m": 1.409,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.76,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.438,
+          "x_m": -0.141,
+          "y_m": -0.308,
+          "z_m": 2.414,
+          "bearing_deg": -3.4,
+          "direction": "ahead",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100001,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.19,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 5.122,
+          "x_m": -2.483,
+          "y_m": -0.401,
+          "z_m": 4.462,
+          "bearing_deg": -29.1,
+          "direction": "left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 2,
+      "t": 2.02,
+      "capture_unix_s": 1791688277.701,
+      "capture_monotonic_s": 820177.609,
+      "latency_ms": 812.0,
+      "fps": 0.9,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.425,
+      "objects": [
+        {
+          "id": 2,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.5,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 1.808,
+          "x_m": 0.985,
+          "y_m": -0.469,
+          "z_m": 1.442,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.78,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.439,
+          "x_m": -0.143,
+          "y_m": -0.305,
+          "z_m": 2.415,
+          "bearing_deg": -3.4,
+          "direction": "ahead",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100001,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.16,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 5.114,
+          "x_m": -2.482,
+          "y_m": -0.397,
+          "z_m": 4.453,
+          "bearing_deg": -29.1,
+          "direction": "left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 3,
+      "t": 2.89,
+      "capture_unix_s": 1791688278.528,
+      "capture_monotonic_s": 820178.421,
+      "latency_ms": 860.0,
+      "fps": 0.9,
+      "n_detected": 2,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.426,
+      "objects": [
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.88,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 2.439,
+          "x_m": -0.104,
+          "y_m": -0.303,
+          "z_m": 2.418,
+          "bearing_deg": -2.5,
+          "direction": "ahead",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100001,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.19,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 5.118,
+          "x_m": -2.485,
+          "y_m": -0.397,
+          "z_m": 4.457,
+          "bearing_deg": -29.1,
+          "direction": "left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 4,
+      "t": 3.79,
+      "capture_unix_s": 1791688279.395,
+      "capture_monotonic_s": 820179.296,
+      "latency_ms": 907.0,
+      "fps": 0.9,
+      "n_detected": 2,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.447,
+      "objects": [
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.8,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 2.451,
+          "x_m": -0.234,
+          "y_m": -0.301,
+          "z_m": 2.421,
+          "bearing_deg": -5.5,
+          "direction": "ahead",
+          "approach_mps": -0.002,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100001,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.15,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 5.15,
+          "x_m": -2.514,
+          "y_m": -0.421,
+          "z_m": 4.475,
+          "bearing_deg": -29.3,
+          "direction": "left",
+          "approach_mps": -0.008,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 5,
+      "t": 4.68,
+      "capture_unix_s": 1791688280.313,
+      "capture_monotonic_s": 820180.218,
+      "latency_ms": 860.0,
+      "fps": 1.0,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.407,
+      "objects": [
+        {
+          "id": 5,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.68,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.028,
+          "x_m": 1.104,
+          "y_m": -0.528,
+          "z_m": 1.617,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.77,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 2.446,
+          "x_m": -0.172,
+          "y_m": -0.303,
+          "z_m": 2.421,
+          "bearing_deg": -4.1,
+          "direction": "ahead",
+          "approach_mps": -0.001,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 6,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.3,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.867,
+          "x_m": 0.831,
+          "y_m": -0.979,
+          "z_m": 2.564,
+          "bearing_deg": 18.0,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 6,
+      "t": 5.57,
+      "capture_unix_s": 1791688281.199,
+      "capture_monotonic_s": 820181.093,
+      "latency_ms": 860.0,
+      "fps": 1.0,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.426,
+      "objects": [
+        {
+          "id": 5,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.63,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.029,
+          "x_m": 1.105,
+          "y_m": -0.53,
+          "z_m": 1.618,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 6,
+          "range_m": 2.449,
+          "x_m": -0.175,
+          "y_m": -0.304,
+          "z_m": 2.424,
+          "bearing_deg": -4.1,
+          "direction": "ahead",
+          "approach_mps": -0.002,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 6,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.22,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.841,
+          "x_m": 0.814,
+          "y_m": -0.971,
+          "z_m": 2.543,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100001,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.16,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 5.159,
+          "x_m": -2.487,
+          "y_m": -0.397,
+          "z_m": 4.502,
+          "bearing_deg": -28.9,
+          "direction": "left",
+          "approach_mps": -0.011,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 7,
+      "t": 6.45,
+      "capture_unix_s": 1791688282.075,
+      "capture_monotonic_s": 820181.968,
+      "latency_ms": 875.0,
+      "fps": 1.0,
+      "n_detected": 1,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.345,
+      "objects": [
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.86,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 7,
+          "range_m": 2.453,
+          "x_m": -0.166,
+          "y_m": -0.33,
+          "z_m": 2.425,
+          "bearing_deg": -3.9,
+          "direction": "ahead",
+          "approach_mps": -0.002,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 8,
+      "t": 7.33,
+      "capture_unix_s": 1791688282.964,
+      "capture_monotonic_s": 820182.859,
+      "latency_ms": 859.0,
+      "fps": 1.0,
+      "n_detected": 2,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.317,
+      "objects": [
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.58,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.063,
+          "x_m": 1.124,
+          "y_m": -0.536,
+          "z_m": 1.645,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.83,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 8,
+          "range_m": 2.448,
+          "x_m": -0.158,
+          "y_m": -0.335,
+          "z_m": 2.419,
+          "bearing_deg": -3.7,
+          "direction": "ahead",
+          "approach_mps": 0.002,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 9,
+      "t": 8.14,
+      "capture_unix_s": 1791688283.819,
+      "capture_monotonic_s": 820183.718,
+      "latency_ms": 813.0,
+      "fps": 1.0,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.226,
+      "objects": [
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.65,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.104,
+          "x_m": 1.147,
+          "y_m": -0.547,
+          "z_m": 1.677,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 9,
+          "range_m": 2.431,
+          "x_m": -0.165,
+          "y_m": -0.331,
+          "z_m": 2.402,
+          "bearing_deg": -3.9,
+          "direction": "ahead",
+          "approach_mps": 0.009,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.26,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.945,
+          "x_m": 0.842,
+          "y_m": -1.006,
+          "z_m": 2.637,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 10,
+      "t": 8.97,
+      "capture_unix_s": 1791688284.642,
+      "capture_monotonic_s": 820184.546,
+      "latency_ms": 829.0,
+      "fps": 1.0,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.394,
+      "objects": [
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.5,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 2.087,
+          "x_m": 1.138,
+          "y_m": -0.54,
+          "z_m": 1.664,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.82,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 10,
+          "range_m": 2.434,
+          "x_m": -0.297,
+          "y_m": -0.333,
+          "z_m": 2.392,
+          "bearing_deg": -7.1,
+          "direction": "ahead",
+          "approach_mps": 0.01,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.26,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.941,
+          "x_m": 0.843,
+          "y_m": -1.004,
+          "z_m": 2.633,
+          "bearing_deg": 17.8,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 11,
+      "t": 9.82,
+      "capture_unix_s": 1791688285.497,
+      "capture_monotonic_s": 820185.39,
+      "latency_ms": 813.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.432,
+      "objects": [
+        {
+          "id": 10,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.38,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 1.016,
+          "x_m": -0.379,
+          "y_m": -0.096,
+          "z_m": 0.938,
+          "bearing_deg": -22.0,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.55,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 2.065,
+          "x_m": 1.124,
+          "y_m": -0.535,
+          "z_m": 1.647,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.006,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.84,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 11,
+          "range_m": 2.431,
+          "x_m": -0.323,
+          "y_m": -0.332,
+          "z_m": 2.386,
+          "bearing_deg": -7.7,
+          "direction": "ahead",
+          "approach_mps": 0.009,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.19,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.83,
+          "x_m": 0.3,
+          "y_m": -0.389,
+          "z_m": 2.787,
+          "bearing_deg": 6.1,
+          "direction": "ahead",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.29,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 2.933,
+          "x_m": 0.837,
+          "y_m": -1.002,
+          "z_m": 2.627,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 12,
+      "t": 10.68,
+      "capture_unix_s": 1791688286.325,
+      "capture_monotonic_s": 820186.218,
+      "latency_ms": 875.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.502,
+      "objects": [
+        {
+          "id": 10,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.61,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 1.023,
+          "x_m": -0.375,
+          "y_m": -0.091,
+          "z_m": 0.948,
+          "bearing_deg": -21.6,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.36,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 2.04,
+          "x_m": 1.111,
+          "y_m": -0.531,
+          "z_m": 1.627,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.013,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.86,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 12,
+          "range_m": 2.432,
+          "x_m": -0.33,
+          "y_m": -0.331,
+          "z_m": 2.387,
+          "bearing_deg": -7.9,
+          "direction": "ahead",
+          "approach_mps": 0.005,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100004,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.56,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.571,
+          "x_m": -0.756,
+          "y_m": -0.218,
+          "z_m": 2.447,
+          "bearing_deg": -17.2,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.29,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 2.919,
+          "x_m": 0.832,
+          "y_m": -0.997,
+          "z_m": 2.614,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.008,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 13,
+      "t": 11.55,
+      "capture_unix_s": 1791688287.208,
+      "capture_monotonic_s": 820187.109,
+      "latency_ms": 844.0,
+      "fps": 1.1,
+      "n_detected": 6,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.539,
+      "objects": [
+        {
+          "id": 10,
+          "class": "donut",
+          "source": "yolo26",
+          "conf": 0.47,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 1.008,
+          "x_m": -0.346,
+          "y_m": -0.079,
+          "z_m": 0.944,
+          "bearing_deg": -20.1,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.37,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 6,
+          "range_m": 1.998,
+          "x_m": 1.088,
+          "y_m": -0.52,
+          "z_m": 1.593,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.023,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.79,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 13,
+          "range_m": 2.45,
+          "x_m": -0.33,
+          "y_m": -0.334,
+          "z_m": 2.405,
+          "bearing_deg": -7.8,
+          "direction": "ahead",
+          "approach_mps": -0.005,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100004,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.34,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.573,
+          "x_m": -0.746,
+          "y_m": -0.219,
+          "z_m": 2.452,
+          "bearing_deg": -16.9,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.29,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 2.92,
+          "x_m": 0.833,
+          "y_m": -0.998,
+          "z_m": 2.615,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.004,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.24,
+          "rank": 5,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 2.934,
+          "x_m": 0.392,
+          "y_m": -0.4,
+          "z_m": 2.88,
+          "bearing_deg": 7.8,
+          "direction": "ahead",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 14,
+      "t": 12.46,
+      "capture_unix_s": 1791688288.082,
+      "capture_monotonic_s": 820187.984,
+      "latency_ms": 875.0,
+      "fps": 1.1,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.558,
+      "objects": [
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.52,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 7,
+          "range_m": 1.937,
+          "x_m": 1.054,
+          "y_m": -0.507,
+          "z_m": 1.544,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.036,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.83,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 14,
+          "range_m": 2.482,
+          "x_m": -0.411,
+          "y_m": -0.332,
+          "z_m": 2.425,
+          "bearing_deg": -9.6,
+          "direction": "ahead",
+          "approach_mps": -0.012,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.31,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 2.894,
+          "x_m": 0.316,
+          "y_m": -0.393,
+          "z_m": 2.85,
+          "bearing_deg": 6.3,
+          "direction": "ahead",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.29,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 6,
+          "range_m": 2.922,
+          "x_m": 0.834,
+          "y_m": -0.999,
+          "z_m": 2.616,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.002,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 15,
+      "t": 13.36,
+      "capture_unix_s": 1791688288.966,
+      "capture_monotonic_s": 820188.859,
+      "latency_ms": 922.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.593,
+      "objects": [
+        {
+          "id": 10,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.81,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 1.017,
+          "x_m": -0.336,
+          "y_m": -0.13,
+          "z_m": 0.951,
+          "bearing_deg": -19.5,
+          "direction": "slightly left",
+          "approach_mps": -0.002,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.42,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 8,
+          "range_m": 1.936,
+          "x_m": 1.054,
+          "y_m": -0.504,
+          "z_m": 1.543,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.022,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.7,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 15,
+          "range_m": 2.534,
+          "x_m": -0.443,
+          "y_m": -0.343,
+          "z_m": 2.471,
+          "bearing_deg": -10.2,
+          "direction": "slightly left",
+          "approach_mps": -0.028,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.38,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 2.932,
+          "x_m": 0.376,
+          "y_m": -0.402,
+          "z_m": 2.879,
+          "bearing_deg": 7.4,
+          "direction": "ahead",
+          "approach_mps": -0.013,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.22,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 7,
+          "range_m": 2.933,
+          "x_m": 0.837,
+          "y_m": -1.002,
+          "z_m": 2.626,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": -0.003,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 16,
+      "t": 14.29,
+      "capture_unix_s": 1791688289.9,
+      "capture_monotonic_s": 820189.796,
+      "latency_ms": 891.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.635,
+      "objects": [
+        {
+          "id": 10,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.5,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 1.03,
+          "x_m": -0.332,
+          "y_m": -0.137,
+          "z_m": 0.966,
+          "bearing_deg": -19.0,
+          "direction": "slightly left",
+          "approach_mps": -0.007,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.41,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 9,
+          "range_m": 1.899,
+          "x_m": 1.033,
+          "y_m": -0.495,
+          "z_m": 1.514,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.026,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.79,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 16,
+          "range_m": 2.575,
+          "x_m": -0.498,
+          "y_m": -0.347,
+          "z_m": 2.502,
+          "bearing_deg": -11.3,
+          "direction": "slightly left",
+          "approach_mps": -0.03,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.23,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 8,
+          "range_m": 2.939,
+          "x_m": 0.839,
+          "y_m": -1.004,
+          "z_m": 2.632,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": -0.004,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.27,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 3.001,
+          "x_m": 0.409,
+          "y_m": -0.411,
+          "z_m": 2.944,
+          "bearing_deg": 7.9,
+          "direction": "ahead",
+          "approach_mps": -0.036,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 17,
+      "t": 15.16,
+      "capture_unix_s": 1791688290.798,
+      "capture_monotonic_s": 820190.703,
+      "latency_ms": 843.0,
+      "fps": 1.1,
+      "n_detected": 6,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.633,
+      "objects": [
+        {
+          "id": 10,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.49,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 6,
+          "range_m": 1.041,
+          "x_m": -0.332,
+          "y_m": -0.141,
+          "z_m": 0.977,
+          "bearing_deg": -18.8,
+          "direction": "slightly left",
+          "approach_mps": -0.01,
+          "clipped": []
+        },
+        {
+          "id": 14,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.39,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 1.377,
+          "x_m": -0.436,
+          "y_m": -0.209,
+          "z_m": 1.289,
+          "bearing_deg": -18.7,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.54,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 10,
+          "range_m": 1.828,
+          "x_m": 0.996,
+          "y_m": -0.476,
+          "z_m": 1.457,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": 0.041,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 17,
+          "range_m": 2.591,
+          "x_m": -0.491,
+          "y_m": -0.349,
+          "z_m": 2.52,
+          "bearing_deg": -11.0,
+          "direction": "slightly left",
+          "approach_mps": -0.026,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.24,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 9,
+          "range_m": 2.959,
+          "x_m": 0.845,
+          "y_m": -1.009,
+          "z_m": 2.65,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": -0.011,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.22,
+          "rank": 5,
+          "geometry_ok": true,
+          "age_frames": 6,
+          "range_m": 3.021,
+          "x_m": 0.236,
+          "y_m": -0.413,
+          "z_m": 2.983,
+          "bearing_deg": 4.5,
+          "direction": "ahead",
+          "approach_mps": -0.039,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 18,
+      "t": 16.07,
+      "capture_unix_s": 1791688291.669,
+      "capture_monotonic_s": 820191.562,
+      "latency_ms": 922.0,
+      "fps": 1.1,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.571,
+      "objects": [
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.65,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 11,
+          "range_m": 1.773,
+          "x_m": 0.966,
+          "y_m": -0.462,
+          "z_m": 1.414,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": 0.044,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.86,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 18,
+          "range_m": 2.599,
+          "x_m": -0.489,
+          "y_m": -0.35,
+          "z_m": 2.529,
+          "bearing_deg": -10.9,
+          "direction": "slightly left",
+          "approach_mps": -0.019,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.26,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 7,
+          "range_m": 2.951,
+          "x_m": 0.255,
+          "y_m": -0.401,
+          "z_m": 2.912,
+          "bearing_deg": 5.0,
+          "direction": "ahead",
+          "approach_mps": 0.008,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.24,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 10,
+          "range_m": 2.955,
+          "x_m": 0.844,
+          "y_m": -1.009,
+          "z_m": 2.646,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": -0.005,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 19,
+      "t": 16.99,
+      "capture_unix_s": 1791688292.604,
+      "capture_monotonic_s": 820192.5,
+      "latency_ms": 890.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.547,
+      "objects": [
+        {
+          "id": 10,
+          "class": "remote",
+          "source": "yolo26",
+          "conf": 0.55,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 7,
+          "range_m": 1.146,
+          "x_m": -0.422,
+          "y_m": -0.177,
+          "z_m": 1.051,
+          "bearing_deg": -21.9,
+          "direction": "slightly left",
+          "approach_mps": -0.022,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.49,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 12,
+          "range_m": 1.707,
+          "x_m": 0.93,
+          "y_m": -0.445,
+          "z_m": 1.361,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.049,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.86,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 19,
+          "range_m": 2.606,
+          "x_m": -0.487,
+          "y_m": -0.35,
+          "z_m": 2.536,
+          "bearing_deg": -10.9,
+          "direction": "slightly left",
+          "approach_mps": -0.015,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.29,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 8,
+          "range_m": 2.872,
+          "x_m": 0.23,
+          "y_m": -0.389,
+          "z_m": 2.836,
+          "bearing_deg": 4.6,
+          "direction": "ahead",
+          "approach_mps": 0.038,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.24,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 11,
+          "range_m": 2.939,
+          "x_m": 0.839,
+          "y_m": -1.003,
+          "z_m": 2.632,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.003,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 20,
+      "t": 17.85,
+      "capture_unix_s": 1791688293.507,
+      "capture_monotonic_s": 820193.406,
+      "latency_ms": 844.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.513,
+      "objects": [
+        {
+          "id": 10,
+          "class": "remote",
+          "source": "yolo26",
+          "conf": 0.42,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 8,
+          "range_m": 1.204,
+          "x_m": -0.457,
+          "y_m": -0.188,
+          "z_m": 1.098,
+          "bearing_deg": -22.6,
+          "direction": "slightly left",
+          "approach_mps": -0.035,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.47,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 13,
+          "range_m": 1.633,
+          "x_m": 0.89,
+          "y_m": -0.425,
+          "z_m": 1.302,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.057,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.82,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 20,
+          "range_m": 2.603,
+          "x_m": -0.476,
+          "y_m": -0.35,
+          "z_m": 2.535,
+          "bearing_deg": -10.6,
+          "direction": "slightly left",
+          "approach_mps": -0.009,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.3,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 9,
+          "range_m": 2.806,
+          "x_m": 0.242,
+          "y_m": -0.379,
+          "z_m": 2.77,
+          "bearing_deg": 5.0,
+          "direction": "ahead",
+          "approach_mps": 0.053,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.16,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 12,
+          "range_m": 2.921,
+          "x_m": 0.836,
+          "y_m": -0.996,
+          "z_m": 2.616,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.009,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 21,
+      "t": 18.73,
+      "capture_unix_s": 1791688294.362,
+      "capture_monotonic_s": 820194.265,
+      "latency_ms": 860.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.548,
+      "objects": [
+        {
+          "id": 10,
+          "class": "remote",
+          "source": "yolo26",
+          "conf": 0.5,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 9,
+          "range_m": 1.242,
+          "x_m": -0.463,
+          "y_m": -0.197,
+          "z_m": 1.135,
+          "bearing_deg": -22.2,
+          "direction": "slightly left",
+          "approach_mps": -0.038,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.56,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 14,
+          "range_m": 1.589,
+          "x_m": 0.865,
+          "y_m": -0.414,
+          "z_m": 1.266,
+          "bearing_deg": 34.3,
+          "direction": "right",
+          "approach_mps": 0.051,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.85,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 21,
+          "range_m": 2.603,
+          "x_m": -0.477,
+          "y_m": -0.352,
+          "z_m": 2.535,
+          "bearing_deg": -10.7,
+          "direction": "slightly left",
+          "approach_mps": -0.005,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.31,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 10,
+          "range_m": 2.753,
+          "x_m": 0.224,
+          "y_m": -0.374,
+          "z_m": 2.718,
+          "bearing_deg": 4.7,
+          "direction": "ahead",
+          "approach_mps": 0.056,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.2,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 13,
+          "range_m": 2.91,
+          "x_m": 0.832,
+          "y_m": -0.993,
+          "z_m": 2.605,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.011,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 22,
+      "t": 19.63,
+      "capture_unix_s": 1791688295.234,
+      "capture_monotonic_s": 820195.14,
+      "latency_ms": 891.0,
+      "fps": 1.1,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.479,
+      "objects": [
+        {
+          "id": 10,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.55,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 10,
+          "range_m": 1.276,
+          "x_m": -0.464,
+          "y_m": -0.215,
+          "z_m": 1.17,
+          "bearing_deg": -21.6,
+          "direction": "slightly left",
+          "approach_mps": -0.038,
+          "clipped": []
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 22,
+          "range_m": 2.603,
+          "x_m": -0.477,
+          "y_m": -0.35,
+          "z_m": 2.535,
+          "bearing_deg": -10.7,
+          "direction": "slightly left",
+          "approach_mps": -0.003,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.25,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 11,
+          "range_m": 2.716,
+          "x_m": 0.156,
+          "y_m": -0.369,
+          "z_m": 2.686,
+          "bearing_deg": 3.3,
+          "direction": "ahead",
+          "approach_mps": 0.048,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.17,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 14,
+          "range_m": 2.891,
+          "x_m": 0.826,
+          "y_m": -0.987,
+          "z_m": 2.589,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.013,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 23,
+      "t": 20.53,
+      "capture_unix_s": 1791688296.149,
+      "capture_monotonic_s": 820196.046,
+      "latency_ms": 891.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.776,
+      "objects": [
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.24,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 15,
+          "range_m": 1.563,
+          "x_m": 0.852,
+          "y_m": -0.409,
+          "z_m": 1.245,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": 0.035,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.71,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 23,
+          "range_m": 2.578,
+          "x_m": -0.305,
+          "y_m": -0.35,
+          "z_m": 2.536,
+          "bearing_deg": -6.8,
+          "direction": "ahead",
+          "approach_mps": -0.002,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.32,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 15,
+          "range_m": 2.84,
+          "x_m": 0.812,
+          "y_m": -0.969,
+          "z_m": 2.543,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.028,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 24,
+      "t": 21.46,
+      "capture_unix_s": 1791688297.061,
+      "capture_monotonic_s": 820196.968,
+      "latency_ms": 891.0,
+      "fps": 1.1,
+      "n_detected": 5,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.78,
+      "objects": [
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.49,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 1.119,
+          "x_m": -0.219,
+          "y_m": -0.285,
+          "z_m": 1.06,
+          "bearing_deg": -11.7,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.32,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 16,
+          "range_m": 1.619,
+          "x_m": 0.882,
+          "y_m": -0.424,
+          "z_m": 1.289,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": 0.002,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.64,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 24,
+          "range_m": 2.571,
+          "x_m": -0.232,
+          "y_m": -0.35,
+          "z_m": 2.537,
+          "bearing_deg": -5.2,
+          "direction": "ahead",
+          "approach_mps": -0.002,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.22,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 12,
+          "range_m": 2.703,
+          "x_m": 0.245,
+          "y_m": -0.368,
+          "z_m": 2.667,
+          "bearing_deg": 5.3,
+          "direction": "ahead",
+          "approach_mps": 0.033,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.19,
+          "rank": 4,
+          "geometry_ok": true,
+          "age_frames": 16,
+          "range_m": 2.81,
+          "x_m": 0.804,
+          "y_m": -0.959,
+          "z_m": 2.516,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.029,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 25,
+      "t": 22.37,
+      "capture_unix_s": 1791688297.982,
+      "capture_monotonic_s": 820197.875,
+      "latency_ms": 890.0,
+      "fps": 1.1,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.821,
+      "objects": [
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.57,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 1.114,
+          "x_m": -0.221,
+          "y_m": -0.291,
+          "z_m": 1.053,
+          "bearing_deg": -11.9,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 7,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.59,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 17,
+          "range_m": 1.74,
+          "x_m": 0.949,
+          "y_m": -0.454,
+          "z_m": 1.386,
+          "bearing_deg": 34.4,
+          "direction": "right",
+          "approach_mps": -0.041,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.73,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 25,
+          "range_m": 2.68,
+          "x_m": -0.224,
+          "y_m": -0.366,
+          "z_m": 2.646,
+          "bearing_deg": -4.8,
+          "direction": "ahead",
+          "approach_mps": -0.049,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.27,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 17,
+          "range_m": 2.797,
+          "x_m": 0.799,
+          "y_m": -0.955,
+          "z_m": 2.504,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.023,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 26,
+      "t": 23.29,
+      "capture_unix_s": 1791688298.883,
+      "capture_monotonic_s": 820198.781,
+      "latency_ms": 906.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.71,
+      "objects": [
+        {
+          "id": 20,
+          "class": "mouse",
+          "source": "yolo26",
+          "conf": 0.88,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 1.122,
+          "x_m": -0.212,
+          "y_m": -0.317,
+          "z_m": 1.056,
+          "bearing_deg": -11.4,
+          "direction": "slightly left",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.78,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 26,
+          "range_m": 2.742,
+          "x_m": -0.173,
+          "y_m": -0.376,
+          "z_m": 2.711,
+          "bearing_deg": -3.7,
+          "direction": "ahead",
+          "approach_mps": -0.058,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.16,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 18,
+          "range_m": 2.788,
+          "x_m": 0.797,
+          "y_m": -0.951,
+          "z_m": 2.497,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.017,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 27,
+      "t": 24.21,
+      "capture_unix_s": 1791688299.816,
+      "capture_monotonic_s": 820199.718,
+      "latency_ms": 907.0,
+      "fps": 1.1,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.607,
+      "objects": [
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.74,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 1.111,
+          "x_m": -0.176,
+          "y_m": -0.293,
+          "z_m": 1.058,
+          "bearing_deg": -9.4,
+          "direction": "ahead",
+          "approach_mps": -0.0,
+          "clipped": []
+        },
+        {
+          "id": 25,
+          "class": "chair",
+          "source": "yolo26",
+          "conf": 0.18,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 2.718,
+          "x_m": 0.776,
+          "y_m": -0.929,
+          "z_m": 2.434,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.16,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 19,
+          "range_m": 2.775,
+          "x_m": 0.792,
+          "y_m": -0.948,
+          "z_m": 2.486,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.015,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.88,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 27,
+          "range_m": 2.783,
+          "x_m": -0.189,
+          "y_m": -0.384,
+          "z_m": 2.75,
+          "bearing_deg": -3.9,
+          "direction": "ahead",
+          "approach_mps": -0.052,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 28,
+      "t": 25.21,
+      "capture_unix_s": 1791688300.737,
+      "capture_monotonic_s": 820200.64,
+      "latency_ms": 969.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.644,
+      "objects": [
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.8,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 1.11,
+          "x_m": -0.168,
+          "y_m": -0.285,
+          "z_m": 1.059,
+          "bearing_deg": -9.0,
+          "direction": "ahead",
+          "approach_mps": -0.001,
+          "clipped": []
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.39,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 20,
+          "range_m": 2.774,
+          "x_m": 0.791,
+          "y_m": -0.947,
+          "z_m": 2.484,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.009,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.85,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 28,
+          "range_m": 2.784,
+          "x_m": -0.198,
+          "y_m": -0.385,
+          "z_m": 2.75,
+          "bearing_deg": -4.1,
+          "direction": "ahead",
+          "approach_mps": -0.031,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 29,
+      "t": 26.18,
+      "capture_unix_s": 1791688301.743,
+      "capture_monotonic_s": 820201.64,
+      "latency_ms": 969.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.683,
+      "objects": [
+        {
+          "id": 27,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.48,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 0.899,
+          "x_m": 0.484,
+          "y_m": -0.226,
+          "z_m": 0.723,
+          "bearing_deg": 33.8,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 6,
+          "range_m": 1.184,
+          "x_m": -0.178,
+          "y_m": -0.31,
+          "z_m": 1.129,
+          "bearing_deg": -9.0,
+          "direction": "ahead",
+          "approach_mps": -0.029,
+          "clipped": []
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.76,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 29,
+          "range_m": 2.779,
+          "x_m": -0.191,
+          "y_m": -0.386,
+          "z_m": 2.746,
+          "bearing_deg": -4.0,
+          "direction": "ahead",
+          "approach_mps": -0.017,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 30,
+      "t": 27.14,
+      "capture_unix_s": 1791688302.722,
+      "capture_monotonic_s": 820202.625,
+      "latency_ms": 906.0,
+      "fps": 1.1,
+      "n_detected": 4,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.643,
+      "objects": [
+        {
+          "id": 27,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.21,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 0.9,
+          "x_m": 0.484,
+          "y_m": -0.226,
+          "z_m": 0.724,
+          "bearing_deg": 33.7,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.72,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 7,
+          "range_m": 1.232,
+          "x_m": -0.189,
+          "y_m": -0.334,
+          "z_m": 1.171,
+          "bearing_deg": -9.2,
+          "direction": "ahead",
+          "approach_mps": -0.035,
+          "clipped": []
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.27,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 21,
+          "range_m": 2.752,
+          "x_m": 0.785,
+          "y_m": -0.94,
+          "z_m": 2.464,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.01,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.75,
+          "rank": 3,
+          "geometry_ok": true,
+          "age_frames": 30,
+          "range_m": 2.769,
+          "x_m": -0.156,
+          "y_m": -0.381,
+          "z_m": 2.738,
+          "bearing_deg": -3.3,
+          "direction": "ahead",
+          "approach_mps": -0.007,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 31,
+      "t": 28.07,
+      "capture_unix_s": 1791688303.655,
+      "capture_monotonic_s": 820203.562,
+      "latency_ms": 906.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.621,
+      "objects": [
+        {
+          "id": 20,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.48,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 8,
+          "range_m": 1.267,
+          "x_m": -0.207,
+          "y_m": -0.363,
+          "z_m": 1.196,
+          "bearing_deg": -9.8,
+          "direction": "ahead",
+          "approach_mps": -0.032,
+          "clipped": []
+        },
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.21,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 22,
+          "range_m": 2.715,
+          "x_m": 0.775,
+          "y_m": -0.927,
+          "z_m": 2.431,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.02,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.86,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 31,
+          "range_m": 2.765,
+          "x_m": -0.205,
+          "y_m": -0.381,
+          "z_m": 2.731,
+          "bearing_deg": -4.3,
+          "direction": "ahead",
+          "approach_mps": -0.001,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 32,
+      "t": 29.01,
+      "capture_unix_s": 1791688304.592,
+      "capture_monotonic_s": 820204.5,
+      "latency_ms": 921.0,
+      "fps": 1.1,
+      "n_detected": 2,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.269,
+      "objects": [
+        {
+          "id": 9,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.18,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 23,
+          "range_m": 2.716,
+          "x_m": 0.776,
+          "y_m": -0.926,
+          "z_m": 2.432,
+          "bearing_deg": 17.7,
+          "direction": "slightly right",
+          "approach_mps": 0.012,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 32,
+          "range_m": 2.759,
+          "x_m": -0.201,
+          "y_m": -0.373,
+          "z_m": 2.726,
+          "bearing_deg": -4.2,
+          "direction": "ahead",
+          "approach_mps": 0.001,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 33,
+      "t": 29.97,
+      "capture_unix_s": 1791688305.529,
+      "capture_monotonic_s": 820205.421,
+      "latency_ms": 954.0,
+      "fps": 1.1,
+      "n_detected": 1,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.517,
+      "objects": [
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.87,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 33,
+          "range_m": 2.742,
+          "x_m": -0.125,
+          "y_m": -0.37,
+          "z_m": 2.714,
+          "bearing_deg": -2.6,
+          "direction": "ahead",
+          "approach_mps": 0.006,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 34,
+      "t": 30.93,
+      "capture_unix_s": 1791688306.494,
+      "capture_monotonic_s": 820206.39,
+      "latency_ms": 953.0,
+      "fps": 1.1,
+      "n_detected": 2,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.574,
+      "objects": [
+        {
+          "id": 31,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.83,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 1.909,
+          "x_m": 0.478,
+          "y_m": -0.4,
+          "z_m": 1.804,
+          "bearing_deg": 14.8,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.91,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 34,
+          "range_m": 2.708,
+          "x_m": -0.171,
+          "y_m": -0.366,
+          "z_m": 2.677,
+          "bearing_deg": -3.7,
+          "direction": "ahead",
+          "approach_mps": 0.019,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 35,
+      "t": 31.89,
+      "capture_unix_s": 1791688307.449,
+      "capture_monotonic_s": 820207.343,
+      "latency_ms": 953.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.699,
+      "objects": [
+        {
+          "id": 27,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.19,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 3,
+          "range_m": 0.899,
+          "x_m": 0.483,
+          "y_m": -0.226,
+          "z_m": 0.724,
+          "bearing_deg": 33.7,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 31,
+          "class": "cell phone",
+          "source": "yolo26",
+          "conf": 0.94,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 2,
+          "range_m": 1.881,
+          "x_m": 0.462,
+          "y_m": -0.4,
+          "z_m": 1.779,
+          "bearing_deg": 14.5,
+          "direction": "slightly right",
+          "approach_mps": null,
+          "clipped": []
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.86,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 35,
+          "range_m": 2.689,
+          "x_m": -0.214,
+          "y_m": -0.363,
+          "z_m": 2.656,
+          "bearing_deg": -4.6,
+          "direction": "ahead",
+          "approach_mps": 0.02,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 36,
+      "t": 32.8,
+      "capture_unix_s": 1791688308.408,
+      "capture_monotonic_s": 820208.312,
+      "latency_ms": 891.0,
+      "fps": 1.1,
+      "n_detected": 2,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.4,
+      "objects": [
+        {
+          "id": 27,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.29,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 4,
+          "range_m": 0.902,
+          "x_m": 0.486,
+          "y_m": -0.227,
+          "z_m": 0.725,
+          "bearing_deg": 33.9,
+          "direction": "right",
+          "approach_mps": -0.001,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.79,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 36,
+          "range_m": 2.656,
+          "x_m": -0.176,
+          "y_m": -0.353,
+          "z_m": 2.627,
+          "bearing_deg": -3.8,
+          "direction": "ahead",
+          "approach_mps": 0.025,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 37,
+      "t": 33.71,
+      "capture_unix_s": 1791688309.312,
+      "capture_monotonic_s": 820209.218,
+      "latency_ms": 907.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.285,
+      "objects": [
+        {
+          "id": 27,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.56,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 5,
+          "range_m": 0.905,
+          "x_m": 0.489,
+          "y_m": -0.228,
+          "z_m": 0.727,
+          "bearing_deg": 33.9,
+          "direction": "right",
+          "approach_mps": -0.001,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.59,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 37,
+          "range_m": 2.635,
+          "x_m": -0.164,
+          "y_m": -0.332,
+          "z_m": 2.609,
+          "bearing_deg": -3.6,
+          "direction": "ahead",
+          "approach_mps": 0.023,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.19,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 13,
+          "range_m": 2.705,
+          "x_m": 0.393,
+          "y_m": -0.329,
+          "z_m": 2.656,
+          "bearing_deg": 8.4,
+          "direction": "ahead",
+          "approach_mps": 0.02,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 38,
+      "t": 34.66,
+      "capture_unix_s": 1791688310.236,
+      "capture_monotonic_s": 820210.14,
+      "latency_ms": 922.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.197,
+      "objects": [
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.78,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 38,
+          "range_m": 2.554,
+          "x_m": -0.062,
+          "y_m": -0.304,
+          "z_m": 2.535,
+          "bearing_deg": -1.4,
+          "direction": "ahead",
+          "approach_mps": 0.045,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.15,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 14,
+          "range_m": 2.722,
+          "x_m": 0.456,
+          "y_m": -0.315,
+          "z_m": 2.665,
+          "bearing_deg": 9.7,
+          "direction": "ahead",
+          "approach_mps": 0.008,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 100018,
+          "class": "elevator door",
+          "source": "world",
+          "conf": 0.16,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 5.124,
+          "x_m": -2.48,
+          "y_m": -0.392,
+          "z_m": 4.466,
+          "bearing_deg": -29.0,
+          "direction": "left",
+          "approach_mps": null,
+          "clipped": [
+            "left",
+            "bottom"
+          ]
+        }
+      ]
+    },
+    {
+      "frame": 39,
+      "t": 35.61,
+      "capture_unix_s": 1791688311.172,
+      "capture_monotonic_s": 820211.078,
+      "latency_ms": 937.0,
+      "fps": 1.1,
+      "n_detected": 3,
+      "n_detected_no_geometry": 0,
+      "corridor_min_z_m": 2.157,
+      "objects": [
+        {
+          "id": 35,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.44,
+          "rank": 0,
+          "geometry_ok": true,
+          "age_frames": 1,
+          "range_m": 1.091,
+          "x_m": 0.589,
+          "y_m": -0.278,
+          "z_m": 0.875,
+          "bearing_deg": 34.0,
+          "direction": "right",
+          "approach_mps": null,
+          "clipped": [
+            "right",
+            "bottom"
+          ]
+        },
+        {
+          "id": 1,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.68,
+          "rank": 1,
+          "geometry_ok": true,
+          "age_frames": 39,
+          "range_m": 2.469,
+          "x_m": -0.019,
+          "y_m": -0.298,
+          "z_m": 2.451,
+          "bearing_deg": -0.5,
+          "direction": "ahead",
+          "approach_mps": 0.062,
+          "clipped": [
+            "bottom"
+          ]
+        },
+        {
+          "id": 11,
+          "class": "person",
+          "source": "yolo26",
+          "conf": 0.17,
+          "rank": 2,
+          "geometry_ok": true,
+          "age_frames": 15,
+          "range_m": 2.736,
+          "x_m": 0.5,
+          "y_m": -0.323,
+          "z_m": 2.671,
+          "bearing_deg": 10.6,
+          "direction": "slightly right",
+          "approach_mps": 0.003,
+          "clipped": [
+            "bottom"
+          ]
+        }
+      ]
+    }
+  ]
+}
