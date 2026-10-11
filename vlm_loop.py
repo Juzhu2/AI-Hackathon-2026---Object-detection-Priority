@@ -1,22 +1,36 @@
-"""Webcam (or video file) -> Ollama VLM -> prioritizer -> speech.
+"""Camera (live, shared-frame file, or video) -> Ollama VLM -> prioritizer -> speech,
+plus an optional fast path driven by the geometry fuser's output.
+
+Two modes (switch while running: type a key, then Enter):
+  n  navigation mode   short, continuous, path-focused sentences (walking / outdoors)
+  d  description mode  one longer, ordered description of the view, on demand (user is safe)
+  r  describe again    a fresh description (switches to description mode if needed)
+Hazards from the fast path stay ON in both modes and cut off whatever is being said.
 
 Pipeline features:
   - downscaled frames, capped output, keep_alive, warm-up call at startup
-  - frames sent only when the scene changed (plus a periodic refresh)
-  - the model is told what was already said, so it only reports what is new
-  - a prioritizer: one waiting slot (newest wins), hazards outrank descriptions,
-    stale sentences are dropped, near-duplicates are suppressed for COOLDOWN_S
+  - navigation: frames sent only when the scene changed (plus a periodic refresh)
+  - a prioritizer: one waiting slot (newest wins) for navigation, an ordered backlog for
+    description-mode narration, hazards outrank everything and INTERRUPT speech mid-sentence,
+    stale sentences are dropped, near-duplicate navigation sentences are suppressed
+  - fast path (fastpath.py): hazards from the fuser's JSONL stream
 
 Install: pip install opencv-python-headless requests numpy
-Run:     python vlm_loop.py            (live webcam)
-         python vlm_loop.py clip.mp4   (replay a recording in real time)
+Run:     python vlm_loop.py                                  live webcam
+         python vlm_loop.py clip.mp4                         replay a recording in real time
+         python vlm_loop.py --frame-file /dev/shm/latest.jpg frames saved by the fuser process
+Add:     --fused /dev/shm/fused.jsonl                        enable the fast path
+         --mode description                                  start in description mode
 """
+import argparse
 import base64
 import json
+import os
 import re
 import sys
 import threading
 import time
+from collections import deque
 
 import cv2
 import numpy as np
@@ -27,11 +41,15 @@ MODEL = "gemma3:4b"       # also tested: gemma4:26b (needs "think": False)
 CAMERA_INDEX = 0
 
 MAX_SIDE = 512            # downscale long side to this many pixels
-MAX_TOKENS = 40           # hard cap on output length
+MAX_TOKENS = 40           # navigation: hard cap on output length
 CHANGE_THRESHOLD = 12.0   # mean pixel difference (0-255) that counts as "changed"
 MIN_INTERVAL_S = 1.0      # never call more often than this
 MAX_INTERVAL_S = 8.0      # force a refresh at least this often
 DARK_THRESHOLD = 20.0     # mean brightness (0-255) below this = camera blocked/dark
+
+# Description mode
+DESCRIBE_MAX_TOKENS = 200   # roughly 4-5 sentences
+NARRATION_TTL_S = 120.0     # narration sentences wait in order; they do not go stale quickly
 
 # Prioritizer settings
 COOLDOWN_S = 10.0         # the same thing may be said again after this many seconds
@@ -50,13 +68,34 @@ PROMPT = (
     "You are the eyes for a blind person. Say the most important things you can "
     "clearly see right now, with direction (left, ahead, right). One sentence, "
     "maximum 12 words. Only mention things that are definitely visible; never "
-    "guess or invent. If the image is dark, blocked, blurry, or unclear, "
+    "guess or invent. You see a single still image, so never describe motion or "
+    "what anyone is doing or intending. For people, say only that a person is "
+    "present and where; never describe clothing or faces, and never read names "
+    "or badges. If the image is dark, blocked, blurry, or unclear, "
     "reply exactly: Camera view unclear."
 )
 
+DESCRIBE_PROMPT = (
+    "Describe this scene for a blind person who is standing still and is safe. Use 4 to 5 "
+    "short sentences, about 60 words: first the overall setting, then the main objects and "
+    "where they are (left, right, ahead, near, far), then any readable signs or text, then "
+    "notable colors. Describe only what you can see. Do not mention faces, clothing or "
+    "names, and do not say what anyone is doing. "
+    "Only if the image is completely dark or blank, reply exactly: Camera view unclear."
+)
 
-# ---------- camera: keep only the latest frame (avoids stale buffered frames) ----------
+# Used for one retry if the model answers "Camera view unclear" on a frame that looks normal.
+SIMPLE_DESCRIBE_PROMPT = (
+    "Describe this image in 4 short sentences for a blind person. "
+    "Say where things are (left, right, ahead)."
+)
+FLAT_THRESHOLD = 8.0        # gray-level spread below this = blank wall / lens cap, not a normal scene
+
+
+# ---------- camera sources: all offer .get() -> newest frame (BGR) or None ----------
 class LatestFrame:
+    """Live webcam. Reads in a thread so we always get the newest frame, not a stale buffered one."""
+
     def __init__(self, index):
         self.cap = cv2.VideoCapture(index)
         self.frame = None
@@ -73,6 +112,31 @@ class LatestFrame:
     def get(self):
         with self.lock:
             return None if self.frame is None else self.frame.copy()
+
+
+class SharedFrame:
+    """Newest frame that ANOTHER process (the fuser) saved to a file such as /dev/shm/latest.jpg.
+    The writer must save atomically: write to a temp name ending in .jpg, then os.replace().
+    Returns None if the file is missing or older than max_age_s (camera stalled)."""
+
+    def __init__(self, path, max_age_s=2.0):
+        self.path = path
+        self.max_age_s = max_age_s
+        self.last_mtime = 0.0
+        self.last = None
+
+    def get(self):
+        try:
+            mtime = os.stat(self.path).st_mtime
+        except FileNotFoundError:
+            return None
+        if time.time() - mtime > self.max_age_s:
+            return None
+        if mtime != self.last_mtime:
+            img = cv2.imread(self.path)
+            if img is not None:
+                self.last, self.last_mtime = img, mtime
+        return None if self.last is None else self.last.copy()
 
 
 class VideoFrame:
@@ -168,57 +232,140 @@ def told_recently(n=2):
 
 
 # ---------- speech + prioritizer ----------
-def speak(text):
-    # Replace with Piper / Kokoro. For a quick test on Linux: subprocess.run(["espeak-ng", text])
+def speak(text, cancel=None):
+    """Speak one sentence. `cancel` is an Event: if it gets set, stop talking immediately.
+    Real TTS: start Piper/Kokoro/espeak-ng as a subprocess (Popen), poll `cancel`
+    while it runs, and call proc.terminate() if it is set."""
     print(f"[SPEAK] {text}")
     if SIMULATE_SPEECH_TIME:
-        time.sleep(len(text.split()) / SPEAK_WORDS_PER_S)
+        end = time.time() + len(text.split()) / SPEAK_WORDS_PER_S
+        while time.time() < end:
+            if cancel is not None and cancel.is_set():
+                print("[interrupted]")
+                return
+            time.sleep(0.05)
 
 
 class Speaker:
-    """One waiting slot. A newer sentence replaces an older one of the same or lower
-    priority; a more urgent one is never replaced by a less urgent one. Sentences
-    that waited longer than their TTL are dropped instead of spoken late."""
+    """Two ways to get something spoken:
+      submit()   one waiting slot. A newer sentence replaces an older one of the same or lower
+                 priority; a more urgent one is never replaced by a less urgent one. Sentences
+                 that waited longer than their TTL are dropped. Used for navigation and hazards.
+      narrate()  an ordered backlog (spoken first-in first-out when the slot is empty) for
+                 description mode, where sentences must not replace each other.
+    A higher-priority sentence cuts off a lower-priority one being spoken right now, and any
+    urgent submit() also discards the rest of a narration (the moment has passed)."""
 
     def __init__(self):
         self.cv = threading.Condition()
-        self.pending = None       # (priority, text, created, ttl)
+        self.pending = None       # (priority, text, created, ttl, kind)
+        self.backlog = deque()    # same tuples, kind == "narration"
         self.speaking = False
+        self.current_priority = 0
+        self.current_kind = None
+        self.cancel = threading.Event()
         threading.Thread(target=self._run, daemon=True).start()
 
-    def submit(self, text, priority=INFO, ttl=INFO_TTL_S):
-        if is_repeat(text):
+    def submit(self, text, priority=INFO, ttl=INFO_TTL_S, dedupe=True):
+        if dedupe and is_repeat(text):
             return "repeat suppressed"
         with self.cv:
             if self.pending is not None and self.pending[0] > priority:
                 return "outranked"
             replaced = self.pending is not None
-            self.pending = (priority, text, time.time(), ttl)
+            self.pending = (priority, text, time.time(), ttl, "alert" if priority > INFO else "info")
+            if priority > INFO:
+                self.backlog.clear()         # anything urgent ends a narration in progress
+            if self.speaking and priority > self.current_priority:
+                self.cancel.set()            # urgent: cut off the sentence being spoken
             self.cv.notify()
         return "replaced waiting sentence" if replaced else "queued"
 
+    def narrate(self, text):
+        with self.cv:
+            self.backlog.append((INFO, text, time.time(), NARRATION_TTL_S, "narration"))
+            self.cv.notify()
+
+    def stop_narration(self):
+        with self.cv:
+            self.backlog.clear()
+            if self.speaking and self.current_kind == "narration":
+                self.cancel.set()
+
     def idle(self):
         with self.cv:
-            return not self.speaking and self.pending is None
+            return not self.speaking and self.pending is None and not self.backlog
 
     def _run(self):
         while True:
             with self.cv:
-                while self.pending is None:
+                while self.pending is None and not self.backlog:
                     self.cv.wait()
-                priority, text, created, ttl = self.pending
-                self.pending = None
+                if self.pending is not None:
+                    item, self.pending = self.pending, None
+                else:
+                    item = self.backlog.popleft()
+                priority, text, created, ttl, kind = item
                 self.speaking = True
+                self.current_priority = priority
+                self.current_kind = kind
+                self.cancel.clear()
             if time.time() - created > ttl:
                 print(f"[dropped stale] {text}")
             else:
                 mark_spoken(text)
-                speak(text)
+                speak(text, self.cancel)
             with self.cv:
                 self.speaking = False
+                self.current_priority = 0
+                self.current_kind = None
 
 
 speaker = Speaker()
+
+
+# ---------- modes ----------
+NAV, DESCRIBE = "navigation", "description"
+_mode = NAV
+_mode_lock = threading.Lock()
+describe_request = threading.Event()
+
+
+def current_mode():
+    with _mode_lock:
+        return _mode
+
+
+def request_describe():
+    """Ask for a fresh, longer description of the current view (cuts off narration in progress)."""
+    speaker.stop_narration()
+    describe_request.set()
+
+
+def set_mode(new):
+    """The single hook for switching modes: keyboard now, a voice command or button later."""
+    global _mode
+    with _mode_lock:
+        changed = new != _mode
+        _mode = new
+    if changed:
+        speaker.stop_narration()
+        speaker.submit(f"{new.capitalize()} mode.", priority=HAZARD, ttl=3.0, dedupe=False)
+        print(f"(mode -> {new})")
+    if new == DESCRIBE:
+        request_describe()
+    else:
+        describe_request.clear()
+
+
+def input_worker():
+    print("(keys, then Enter:  n = navigation   d = description   r = describe again)")
+    for line in sys.stdin:
+        cmd = line.strip().lower()
+        if cmd in ("n", "nav", "navigation"):
+            set_mode(NAV)
+        elif cmd in ("d", "desc", "description", "describe", "r", "again"):
+            set_mode(DESCRIBE)       # entering (or re-entering) description mode starts a description
 
 
 # ---------- VLM calls ----------
@@ -249,22 +396,24 @@ def warm_up():
     print(f"(model warm after {time.time() - t0:.1f}s)")
 
 
-def describe(frame):
-    payload = {
+def _payload(frame, prompt, max_tokens):
+    return {
         "model": MODEL,
         "stream": True,
         "keep_alive": "30m",             # keep the model loaded in memory
         "think": False,                  # reasoning mode would eat the token budget
-        "options": {"num_predict": MAX_TOKENS, "temperature": 0},
-        "messages": [{
-            "role": "user",
-            "content": build_prompt(),
-            "images": [to_b64_jpeg(downscale(frame))],
-        }],
+        "options": {"num_predict": max_tokens, "temperature": 0},
+        "messages": [{"role": "user", "content": prompt,
+                      "images": [to_b64_jpeg(downscale(frame))]}],
     }
+
+
+def describe(frame):
+    """Navigation mode: ONE short sentence, handed to the prioritizer as soon as it is complete."""
     buf = ""
     t0 = time.time()
-    with requests.post(OLLAMA_URL, json=payload, stream=True, timeout=60) as r:
+    with requests.post(OLLAMA_URL, json=_payload(frame, build_prompt(), MAX_TOKENS),
+                       stream=True, timeout=60) as r:
         r.raise_for_status()
         for line in r.iter_lines():
             if not line:
@@ -289,12 +438,70 @@ def describe(frame):
     print(f"(no complete sentence after {time.time() - t0:.2f}s; nothing spoken)")
 
 
+def _stream_description(frame, prompt):
+    """Stream one long description into the narration backlog, sentence by sentence.
+    Returns "ok", "unclear" (the model gave its fallback phrase; nothing was queued) or
+    "cancelled" (the user switched mode or asked again)."""
+    buf, n, t0 = "", 0, time.time()
+
+    def is_fallback(sentence):
+        return n == 0 and sentence.lower().startswith("camera view unclear")
+
+    with requests.post(OLLAMA_URL, json=_payload(frame, prompt, DESCRIBE_MAX_TOKENS),
+                       stream=True, timeout=90) as r:
+        r.raise_for_status()
+        for line in r.iter_lines():
+            if not line:
+                continue
+            if current_mode() != DESCRIBE or describe_request.is_set():
+                print("(description cancelled)")
+                return "cancelled"
+            chunk = json.loads(line)
+            buf += chunk.get("message", {}).get("content", "")
+            while (m := SENTENCE_END.match(buf)):
+                sentence = m.group(1).strip()
+                if is_fallback(sentence):
+                    return "unclear"
+                speaker.narrate(sentence)
+                n += 1
+                if n == 1:
+                    print(f"(first description sentence after {time.time() - t0:.2f}s)")
+                buf = buf[m.end():]
+            if chunk.get("done"):
+                tail = buf.strip()
+                if tail[-1:] in (".", "!", "?"):
+                    if is_fallback(tail):
+                        return "unclear"
+                    speaker.narrate(tail)
+                    n += 1
+                break
+    print(f"(description: {n} sentences generated in {time.time() - t0:.1f}s)")
+    return "ok"
+
+
+def describe_long(frame):
+    """Description mode: one longer description, spoken in order while it is still being
+    generated. If the model answers "Camera view unclear" although the frame looks like a
+    normal scene (not dark, not flat), the model is refusing rather than the camera failing,
+    so retry once with a simpler prompt before telling the user."""
+    cv2.imwrite("last_described.jpg", downscale(frame))     # debug: exactly what the model sees
+    t = thumb(frame)
+    if float(t.mean()) < DARK_THRESHOLD:
+        speaker.submit("Camera view blocked.", priority=HAZARD, ttl=3.0, dedupe=False)
+        return
+    result = _stream_description(frame, DESCRIBE_PROMPT)
+    if result == "unclear" and float(t.std()) >= FLAT_THRESHOLD:
+        print(f"(model said unclear on a normal-looking frame "
+              f"[brightness {t.mean():.0f}, contrast {t.std():.0f}]; retrying with the simple prompt)")
+        result = _stream_description(frame, SIMPLE_DESCRIBE_PROMPT)
+    if result == "unclear":
+        print(f"(still unclear [brightness {t.mean():.0f}, contrast {t.std():.0f}]; "
+              f"check last_described.jpg)")
+        speaker.narrate("Camera view unclear.")
+
+
 # ---------- main loop ----------
-def main():
-    warm_up()
-    # python vlm_loop.py clip.mp4  -> replay a recording; no argument -> live webcam
-    # (created AFTER warm-up so a replayed clip doesn't start playing while the model loads)
-    cam = VideoFrame(sys.argv[1]) if len(sys.argv) > 1 else LatestFrame(CAMERA_INDEX)
+def run(cam):
     last_sent_thumb, last_sent_time = None, 0.0
 
     while True:
@@ -306,6 +513,15 @@ def main():
             break
         if frame is None:
             time.sleep(0.05)
+            continue
+
+        if current_mode() == DESCRIBE:
+            last_sent_thumb = None   # so navigation describes the scene right away when re-entered
+            if describe_request.is_set():
+                describe_request.clear()
+                describe_long(frame)
+            else:
+                time.sleep(0.05)
             continue
 
         now = time.time()
@@ -324,6 +540,33 @@ def main():
                 describe(frame)      # blocks: only one VLM call in flight at a time
         else:
             time.sleep(0.05)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("video", nargs="?", help="replay this video file instead of a live camera")
+    ap.add_argument("--frame-file", help="read frames another process saves here (e.g. /dev/shm/latest.jpg)")
+    ap.add_argument("--fused", help="follow the fuser's JSONL output (e.g. /dev/shm/fused.jsonl)")
+    ap.add_argument("--mode", choices=[NAV, DESCRIBE], default=NAV, help="starting mode")
+    args = ap.parse_args()
+
+    warm_up()
+    if args.fused:
+        import fastpath
+        fastpath.start(args.fused, speaker.submit, HAZARD)
+        print(f"(fast path following {args.fused})")
+    # Camera objects are created AFTER warm-up so a replayed clip doesn't start playing while
+    # the model loads.
+    if args.video:
+        cam = VideoFrame(args.video)
+    elif args.frame_file:
+        cam = SharedFrame(args.frame_file)
+    else:
+        cam = LatestFrame(CAMERA_INDEX)
+    threading.Thread(target=input_worker, daemon=True).start()
+    if args.mode == DESCRIBE:
+        set_mode(DESCRIBE)
+    run(cam)
 
 
 if __name__ == "__main__":
