@@ -116,13 +116,28 @@ def colorize(depth_map, frame_shape, mode):
 
 
 def draw_depth(image, record):
-    """Write each object's distance near the bottom-left of its box."""
+    """Draw a rank + distance badge inside each box; the nearest object (#0) is red and boxed."""
+    height, width = image.shape[:2]
+    font, scale, thickness, pad = cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2, 6
     for item in record["objects"]:
         depth = item.get("depth")
         if not depth:
             continue
-        text = f"{depth['value']:.1f} m" if depth["unit"] == "m" else f"near {depth['value']:.2f}"
-        x1, _, _, y2 = (int(v) for v in item["bbox_xyxy"])
-        cv2.putText(image, text, (max(0, x1), max(16, y2 - 6)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2)
+        rank = item.get("depth_rank")
+        distance = f"{depth['value']:.1f} m" if depth["unit"] == "m" else f"near {depth['value']:.2f}"
+        label = f"#{rank}  {distance}"
+        x1, y1, x2, y2 = (int(v) for v in item["bbox_xyxy"])
+        nearest = rank == 0
+        if nearest:
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 3)
+
+        (text_w, text_h), baseline = cv2.getTextSize(label, font, scale, thickness)
+        badge_x2 = min(width - 1, x2)
+        badge_x1 = max(0, badge_x2 - text_w - 2 * pad)
+        badge_y1 = min(max(0, y1), height - 1)
+        badge_y2 = min(height - 1, badge_y1 + text_h + baseline + 2 * pad)
+        color = (0, 0, 255) if nearest else (70, 70, 70)  # BGR
+        cv2.rectangle(image, (badge_x1, badge_y1), (badge_x2, badge_y2), color, -1)
+        cv2.putText(image, label, (badge_x1 + pad, badge_y1 + pad + text_h),
+                    font, scale, (255, 255, 255), thickness, cv2.LINE_AA)
     return image
