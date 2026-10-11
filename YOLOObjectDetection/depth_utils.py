@@ -27,6 +27,7 @@ METRIC_MODELS = {
 
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
+METRIC_DISTANCE_OFFSET_M = 1.0
 
 
 def _torch_device(device):
@@ -67,7 +68,10 @@ class DepthEstimator:
         x = torch.from_numpy(rgb).to(self.device).permute(2, 0, 1).unsqueeze(0)
         x = (x.to(self.dtype) / 255.0 - self._mean) / self._std
         depth = self.model(pixel_values=x).predicted_depth  # (1, h, w)
-        return depth[0].float().cpu().numpy()
+        depth_map = depth[0].float().cpu().numpy()
+        if self.mode != "relative":
+            depth_map = np.maximum(depth_map - METRIC_DISTANCE_OFFSET_M, 0.0)
+        return depth_map
 
 
 def object_depth(depth_map, bbox_xyxy, frame_shape, shrink=0.5):
@@ -125,7 +129,7 @@ def corridor_min_depth(depth_map, mode, cols=CORRIDOR_COLS, rows=CORRIDOR_ROWS, 
     strip = depth_map[int(dh * rows[0]):max(int(dh * rows[1]), int(dh * rows[0]) + 1),
                       int(dw * cols[0]):max(int(dw * cols[1]), int(dw * cols[0]) + 1)]
     value = float(np.percentile(strip, percentile))
-    return round(value, 3) if np.isfinite(value) and value > 0 else None
+    return round(value, 3) if np.isfinite(value) and value >= 0 else None
 
 
 def colorize(depth_map, frame_shape, mode):
