@@ -55,6 +55,20 @@ def parse_args():
     parser.add_argument("--confidence", type=float, default=0.15, help="Minimum confidence (0-1)")
     parser.add_argument("--imgsz", type=int, default=960,
                         help="Inference image size. Higher helps small objects (default: 960)")
+    parser.add_argument("--device", default=None,
+                        help="Torch device, e.g. 0 or cpu (default: GPU 0 if CUDA is available)")
+    parser.add_argument("--no-half", action="store_true", help="Disable FP16 inference on GPU")
+    parser.add_argument("--depth", action="store_true",
+                        help="Run Depth Anything V2 and add per-object distance")
+    parser.add_argument("--depth-mode", choices=["indoor", "outdoor", "relative"], default="indoor",
+                        help="indoor/outdoor = metric (meters); relative = 0-1 proximity (default: indoor)")
+    parser.add_argument("--depth-size", choices=["small", "base", "large"], default="small",
+                        help="Depth model size (default: small)")
+    parser.add_argument("--depth-input-size", type=int, default=518,
+                        help="Depth model input size, longer side (default: 518)")
+    parser.add_argument("--depth-every", type=int, default=1,
+                        help="Run depth every N frames and reuse the last map in between (default: 1)")
+    parser.add_argument("--show-depth", action="store_true", help="Open a second window with the depth map")
     parser.add_argument("--width", type=int, default=1280, help="Requested webcam capture width")
     parser.add_argument("--height", type=int, default=720, help="Requested webcam capture height")
     parser.add_argument("--model-type", choices=["yolo26", "world"], default=MODEL_TYPE)
@@ -89,6 +103,18 @@ def main():
         print("Install dependencies first: python -m pip install -r requirements.txt", file=sys.stderr)
         return 1
 
+    import torch
+
+    cuda_ok = torch.cuda.is_available()
+    device = args.device if args.device is not None else (0 if cuda_ok else "cpu")
+    use_half = str(device) != "cpu" and not args.no_half
+    # Ultralytics >= 8.4.80 uses quantize=16 instead of the deprecated half=True.
+    precision = {"quantize": 16} if use_half else {}
+    print(f"torch {torch.__version__} | CUDA available: {cuda_ok} | device: {device} | fp16: {use_half}")
+    if not cuda_ok:
+        print("WARNING: running on CPU. On the GX10 install the cu130 torch build "
+              "(pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130).")
+
     camera = None
     resources = ExitStack()
     window = f"VisionAssist - {args.model_type} + {args.profile} (Q or Esc to quit)"
@@ -116,6 +142,13 @@ def main():
             print(f"Detecting {len(labels)} classes from {args.labels.name}: {labels[:10]}")
         else:
             raise ValueError(f"Unknown model type: {args.model_type}")
+        depth_est = None
+        if args.depth:
+            from depth_utils import DepthEstimator, add_depth, colorize, draw_depth
+
+            depth_est = DepthEstimator(args.depth_size, args.depth_mode, device,
+                                       use_half, args.depth_input_size)
+            print(f"Depth model: {depth_est.model_id} ({args.depth_mode})")
         tracker_path, config = (None, {}) if args.detect_only else resources.enter_context(
             tracking_config(args.profile, args.track_buffer, args.confidence)
         )
@@ -126,6 +159,10 @@ def main():
                     "tracking_config": config, "confidence": args.confidence,
                     "imgsz": args.imgsz,
                     "source": str(args.source) if args.source else f"camera:{args.camera}"}
+        metadata["depth"] = (
+            {"model": depth_est.model_id, "mode": args.depth_mode, "every": args.depth_every}
+            if depth_est else None
+        )
         print(json.dumps(metadata))
         output = None
         if args.json_output:
@@ -152,6 +189,7 @@ def main():
         started = previous = time.perf_counter()
         fps = 0.0
         runtime_logged = False
+        depth_map = None
         while True:
             success, frame = camera.read()
             if not success:
@@ -163,11 +201,11 @@ def main():
             inference_started = time.perf_counter()
             if args.detect_only:
                 result = model.predict(frame, conf=args.confidence, imgsz=args.imgsz,
-                                       verbose=False)[0]
+                                       device=device, verbose=False, **precision)[0]
             else:
                 result = model.track(frame, persist=True, tracker=tracker_path,
                                      conf=args.confidence, imgsz=args.imgsz,
-                                     verbose=False)[0]
+                                     device=device, verbose=False, **precision)[0]
             finished = time.perf_counter()
             instant_fps = 1 / max(finished - previous, 1e-9)
             fps = instant_fps if frame_index == 0 else 0.9 * fps + 0.1 * instant_fps
@@ -176,6 +214,12 @@ def main():
             timestamp = camera.get(cv2.CAP_PROP_POS_MSEC) / 1000 if args.source else finished - started
             record = frame_record(result, frame_index, timestamp, fps,
                                   (finished - inference_started) * 1000, label_cache)
+            if depth_est is not None:
+                depth_started = time.perf_counter()
+                if depth_map is None or frame_index % args.depth_every == 0:
+                    depth_map = depth_est.predict(frame)
+                add_depth(record, depth_map, frame.shape, depth_est.mode)
+                record["depth_ms"] = (time.perf_counter() - depth_started) * 1000
             if not args.detect_only and not runtime_logged:
                 actual = vars(model.predictor.trackers[0].args).copy()
                 actual.pop("device", None)
@@ -191,6 +235,10 @@ def main():
             if args.no_display:
                 continue
             image = draw_debug(cv2, result.plot(), record, metadata["profile"], config)
+            if depth_est is not None:
+                image = draw_depth(image, record)
+                if args.show_depth:
+                    cv2.imshow("Depth", colorize(depth_map, frame.shape, depth_est.mode))
             cv2.imshow(window, image)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), ord("Q"), 27):
